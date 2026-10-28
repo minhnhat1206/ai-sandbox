@@ -1,23 +1,23 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import { apiPlugin } from './server/vite-plugin.ts';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
-    };
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [react(), tailwindcss(), apiPlugin()],
+  server: { port: Number(process.env.PORT ?? 3000), host: '0.0.0.0' },
+  resolve: {
+    alias: {
+      '@shared': path.resolve(here, 'shared'),
+      '@': path.resolve(here, 'src'),
+    },
+  },
+  test: {
+    include: ['tests/**/*.test.ts'],
+    environment: 'node',
+  },
 });
