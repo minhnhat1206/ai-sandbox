@@ -38,7 +38,7 @@ export const DICT = {
   landing_step3_t: { vi: 'Đội của bạn dùng thử', en: 'Your team tries it' },
   landing_step3_d: { vi: 'Mở link, bấm chạy với dữ liệu mẫu hoặc dữ liệu thật. Thấy hiệu quả thì mới hợp tác.', en: 'Open the link, run with sample or real data. Partner with us only if it works.' },
   landing_enter_code: { vi: 'Bạn đã có link mời?', en: 'Have an invite link?' },
-  landing_code_placeholder: { vi: 'Nhập mã mời, ví dụ: demo', en: 'Enter your invite code, e.g. demo' },
+  landing_code_placeholder: { vi: 'Mã mời, ví dụ: demo', en: 'Invite code, e.g. demo' },
   landing_open: { vi: 'Mở sandbox', en: 'Open sandbox' },
   landing_try_demo: { vi: 'Xem sandbox mẫu', en: 'See the demo sandbox' },
   landing_admin: { vi: 'Khu vực quản trị', en: 'Admin console' },
@@ -63,6 +63,7 @@ export const DICT = {
   sb_saves: { vi: 'Tiết kiệm ~{n} phút mỗi lần', en: 'Saves ~{n} min per run' },
   sb_steps: { vi: '{n} bước', en: '{n} steps' },
   sb_uses_docs: { vi: 'Đọc tài liệu công ty', en: 'Reads company docs' },
+  sb_start_here: { vi: 'Bắt đầu ở đây', en: 'Start here' },
 
   // onboarding
   ob_title: { vi: 'Lần đầu dùng AI? Bắt đầu trong 3 bước', en: 'First time with AI? Start in 3 steps' },
@@ -194,6 +195,10 @@ export const DICT = {
   ad_when: { vi: 'Lúc', en: 'When' },
   ad_rating: { vi: 'Đánh giá', en: 'Rating' },
   ad_provider: { vi: 'Nhà cung cấp AI', en: 'AI provider' },
+  ad_chart_runs: { vi: 'Lượt chạy theo ngày', en: 'Runs per day' },
+  ad_chart_popular: { vi: 'Quy trình được dùng nhiều', en: 'Most used workflows' },
+  ad_last_14d: { vi: '14 ngày qua', en: 'Last 14 days' },
+  ad_edit: { vi: 'Sửa', en: 'Edit' },
 } satisfies Record<string, L>;
 
 export type DictKey = keyof typeof DICT;

@@ -1,21 +1,20 @@
-import { BookOpen, Clock, MessageCircle, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { WorkflowCategory } from '@shared/types';
-import { Icon } from '@/components/Icon';
-import { Badge, Button, Card, Input, Modal } from '@/components/ui';
+import { Badge, Button, IconTile, Input, Modal } from '@/components/ui';
+import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { getVisitorName, setVisitorName } from '@/lib/api';
 import { useSandbox } from './context';
 
-const CATEGORY_LABEL: Record<WorkflowCategory, { vi: string; en: string }> = {
-  operations: { vi: 'Vận hành', en: 'Operations' },
-  sales: { vi: 'Kinh doanh', en: 'Sales' },
-  marketing: { vi: 'Marketing', en: 'Marketing' },
-  finance: { vi: 'Tài chính', en: 'Finance' },
-  hr: { vi: 'Nhân sự', en: 'HR' },
-  'customer-service': { vi: 'CSKH', en: 'Customer service' },
-  general: { vi: 'Chung', en: 'General' },
+const CATEGORY_LABEL: Record<WorkflowCategory, { vi: string; en: string; icon: string }> = {
+  operations: { vi: 'Vận hành', en: 'Operations', icon: 'ClipboardList' },
+  sales: { vi: 'Kinh doanh', en: 'Sales', icon: 'Send' },
+  marketing: { vi: 'Marketing', en: 'Marketing', icon: 'Megaphone' },
+  finance: { vi: 'Tài chính', en: 'Finance', icon: 'Receipt' },
+  hr: { vi: 'Nhân sự', en: 'HR', icon: 'Users' },
+  'customer-service': { vi: 'CSKH', en: 'Customer service', icon: 'Headset' },
+  general: { vi: 'Chung', en: 'General', icon: 'Sparkles' },
 };
 
 const ONBOARDED_KEY = 'sandbox.onboarded';
@@ -39,66 +38,82 @@ export default function SandboxHome() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="animate-rise">
-        <h1 className="text-2xl font-bold text-ink-900 md:text-3xl">{t('sb_welcome')} {view.workspace.company} 👋</h1>
-        <p className="mt-2 max-w-2xl text-ink-700">{t('sb_welcome_sub', { company: view.workspace.company })}</p>
-        {view.knowledgeTitles.length > 0 && (
-          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-700">
-            <BookOpen className="h-4 w-4 text-brand-700" /> {t('sb_knowledge_connected')}
-            {view.knowledgeTitles.map((k) => <Badge key={k} tone="neutral">{k}</Badge>)}
-          </p>
-        )}
+    <div className="space-y-7">
+      {/* welcome band */}
+      <section className="grain relative overflow-hidden rounded-xl3 bg-ink-900 px-6 py-8 text-white md:px-10 md:py-10 animate-rise">
+        <div className="pointer-events-none absolute inset-0 dotfield-dark opacity-50" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-jade-8/30 blur-[90px]" />
+        <div className="relative">
+          <p className="eyebrow text-jade-5">{view.workspace.industry || t('brand_sandbox')}</p>
+          <h1 className="display mt-2 text-[30px] font-extrabold md:text-[40px]">{t('sb_welcome')} {view.workspace.company} <span className="inline-block animate-float">👋</span></h1>
+          <p className="mt-3 max-w-2xl text-[15.5px] leading-relaxed text-white/70">{t('sb_welcome_sub', { company: view.workspace.company })}</p>
+          {view.knowledgeTitles.length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-[13px] text-white/70">
+              <Icon name="book" size={16} className="text-amber-6" /> {t('sb_knowledge_connected')}
+              {view.knowledgeTitles.map((k) => <span key={k} className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] font-medium text-white ring-1 ring-white/15">{k}</span>)}
+            </div>
+          )}
+        </div>
       </section>
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Category">
-        {(['all', ...categories] as const).map((c) => (
-          <button key={c} role="tab" aria-selected={filter === c} onClick={() => setFilter(c)} className={`rounded-full px-3 py-1 text-sm font-medium transition ${filter === c ? 'bg-ink-900 text-white' : 'bg-white border border-ink-300 text-ink-700 hover:bg-ink-100'}`}>
-            {c === 'all' ? t('sb_filter_all') : pick(CATEGORY_LABEL[c])}
-          </button>
-        ))}
+      {/* category chips */}
+      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Category">
+        {(['all', ...categories] as const).map((c) => {
+          const active = filter === c;
+          return (
+            <button key={c} role="tab" aria-selected={active} onClick={() => setFilter(c)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${active ? 'bg-jade-12 text-white shadow-[0_6px_16px_-8px_rgb(11_47_39/.8)]' : 'bg-white text-sand-11 hairline hover:bg-sand-1'}`}>
+              {c !== 'all' && <Icon name={CATEGORY_LABEL[c].icon} size={14} className={active ? 'text-jade-5' : 'text-jade-9'} />}
+              {c === 'all' ? t('sb_filter_all') : pick(CATEGORY_LABEL[c])}
+            </button>
+          );
+        })}
       </div>
 
+      {/* gallery */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {list.map((w, i) => (
-          <Card key={w.id} as="article" className="flex flex-col p-5 animate-rise" >
-            <div className="flex items-start justify-between gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Icon name={w.icon} className="h-5 w-5" /></span>
-              <Badge tone="neutral">{pick(CATEGORY_LABEL[w.category])}</Badge>
-            </div>
-            <h2 className="mt-4 text-lg font-semibold text-ink-900">{pick(w.name)}</h2>
-            <p className="mt-1 text-sm font-medium text-brand-800">{pick(w.tagline)}</p>
-            <p className="mt-2 flex-1 text-sm text-ink-700">{pick(w.description)}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-ink-500">
-              <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {t('sb_saves', { n: w.minutesSavedPerRun })}</span>
-              {w.kind === 'form' && w.steps.length > 1 && <span>· {t('sb_steps', { n: w.steps.length })}</span>}
-              {w.useKnowledge && view.knowledgeTitles.length > 0 && <span>· {t('sb_uses_docs')}</span>}
-            </div>
-            <Link to={`/s/${token}/${w.kind === 'chat' ? 'chat' : 'run'}/${w.id}`} className="mt-4">
-              <Button className="w-full" variant={i === 0 ? 'primary' : 'secondary'}>
-                {w.kind === 'chat' ? <><MessageCircle className="h-4 w-4" /> {t('sb_chat')}</> : <><Play className="h-4 w-4" /> {t('sb_try')}</>}
-              </Button>
-            </Link>
-          </Card>
-        ))}
+        {list.map((w, i) => {
+          const first = i === 0 && filter === 'all';
+          return (
+            <article key={w.id} className={`group relative flex flex-col rounded-xl2 bg-white p-5 hairline shadow-[var(--shadow-card)] hover-lift animate-rise delay-${Math.min(i, 6)} ${first ? 'ring-2 ring-jade-6/60' : ''}`}>
+              {first && <span className="absolute -top-2.5 left-5 rounded-full bg-amber-9 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-white shadow">{t('sb_start_here')}</span>}
+              <div className="flex items-start justify-between gap-3">
+                <IconTile name={w.icon} />
+                <Badge tone="neutral">{pick(CATEGORY_LABEL[w.category])}</Badge>
+              </div>
+              <h2 className="mt-4 text-[17px] font-bold tracking-tight text-jade-12">{pick(w.name)}</h2>
+              <p className="mt-1 text-[13.5px] font-medium text-jade-10">{pick(w.tagline)}</p>
+              <p className="mt-2 flex-1 text-[14px] leading-relaxed text-sand-10">{pick(w.description)}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-sand-9">
+                <span className="inline-flex items-center gap-1"><Icon name="clock" size={13} /> {t('sb_saves', { n: w.minutesSavedPerRun })}</span>
+                {w.kind === 'form' && w.steps.length > 1 && <span className="inline-flex items-center gap-1"><Icon name="ListChecks" size={13} /> {t('sb_steps', { n: w.steps.length })}</span>}
+                {w.useKnowledge && view.knowledgeTitles.length > 0 && <span className="inline-flex items-center gap-1"><Icon name="book" size={13} /> {t('sb_uses_docs')}</span>}
+              </div>
+              <Link to={`/s/${token}/${w.kind === 'chat' ? 'chat' : 'run'}/${w.id}`} className="mt-4">
+                <Button className="w-full" variant={first ? 'primary' : 'secondary'} icon={w.kind === 'chat' ? 'chat' : 'play'}>
+                  {w.kind === 'chat' ? t('sb_chat') : t('sb_try')}
+                </Button>
+              </Link>
+            </article>
+          );
+        })}
       </section>
 
-      <Modal open={showOnboarding} onClose={finishOnboarding} title={t('ob_title')}>
+      <Modal open={showOnboarding} onClose={finishOnboarding} title={t('ob_title')} eyebrow={view.workspace.company}>
         <ol className="space-y-3">
           {[t('ob_1'), t('ob_2'), t('ob_3')].map((s, i) => (
-            <li key={i} className="flex gap-3 text-sm text-ink-700">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">{i + 1}</span>
-              <span className="pt-0.5">{s}</span>
+            <li key={i} className={`flex gap-3 rounded-xl bg-sand-2 p-3 text-[14px] text-sand-11 animate-rise delay-${i + 1}`}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-jade-12 font-mono text-[12px] font-bold text-white">{i + 1}</span>
+              <span className="pt-1">{s}</span>
             </li>
           ))}
         </ol>
         <div className="mt-5">
-          <label htmlFor="visitor" className="block text-sm font-medium">{t('ob_name_label')}</label>
+          <label htmlFor="visitor" className="block text-[13px] font-semibold">{t('ob_name_label')}</label>
           <Input id="visitor" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ob_name_placeholder')} className="mt-1.5" />
         </div>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={finishOnboarding}>{t('ob_skip')}</Button>
-          <Button onClick={finishOnboarding}>{t('ob_start')}</Button>
+          <Button onClick={finishOnboarding} icon="sparkle">{t('ob_start')}</Button>
         </div>
       </Modal>
     </div>

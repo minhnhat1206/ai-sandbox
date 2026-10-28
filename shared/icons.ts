@@ -1,6 +1,6 @@
 /**
- * Icon names a workflow may use (lucide-react). Kept as a whitelist so the
- * browser bundle only ships these icons and the catalog validator can check them.
+ * Icon names a workflow may use. Each one is drawn in src/icons (the Lumen set);
+ * the whitelist lets the catalog validator reject unknown names.
  */
 export const WORKFLOW_ICONS = [
   'Sparkles', 'FileText', 'ListChecks', 'BarChart3', 'Send', 'Megaphone', 'MessageSquareReply', 'BookOpenCheck',

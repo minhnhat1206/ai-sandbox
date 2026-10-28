@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
 import { CATALOG } from '../shared/catalog/index.ts';
 import { validateWorkflow } from '../shared/engine/validate.ts';
+import { WORKFLOW_ICONS } from '../shared/icons.ts';
 import { sampleInputs } from '../shared/engine/template.ts';
 import type { AdminOverview, ChatMessage, Lang, Lead, LeadType, Run, RunEvent, SandboxView, Workspace, WorkspaceStatus } from '../shared/types.ts';
 import type { Config } from './config.ts';
@@ -327,7 +328,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!brief) return c.json({ error: 'brief is required' }, 400);
     const lang = asLang(body.lang, 'vi');
     const system = `You design AI workflow definitions for a no-account trial platform. Return ONLY a JSON object (no prose, no code fences) matching this TypeScript type:
-WorkflowDef { id: kebab-case string starting with "custom-"; version: 1; kind: "form"; category: "operations"|"sales"|"marketing"|"finance"|"hr"|"customer-service"|"general"; icon: a lucide-react icon name; name/tagline/description: {vi, en}; tags: string[]; minutesSavedPerRun: number; useKnowledge: boolean; inputs: {key, label:{vi,en}, type:"text"|"textarea"|"select"|"number", required?, rows?, sample: string, options?: {value,label:{vi,en}}[]}[]; steps: {id, title:{vi,en}, system, prompt}[] }
+WorkflowDef { id: kebab-case string starting with "custom-"; version: 1; kind: "form"; category: "operations"|"sales"|"marketing"|"finance"|"hr"|"customer-service"|"general"; icon: one of ${WORKFLOW_ICONS.join('|')}; name/tagline/description: {vi, en}; tags: string[]; minutesSavedPerRun: number; useKnowledge: boolean; inputs: {key, label:{vi,en}, type:"text"|"textarea"|"select"|"number", required?, rows?, sample: string, options?: {value,label:{vi,en}}[]}[]; steps: {id, title:{vi,en}, system, prompt}[] }
 Rules: 1-3 inputs with realistic Vietnamese sample values; 1-2 steps; prompts use {{input.key}}, later steps may use {{steps.id}}; include "{{company}}" and "Write in {{language}}" in system prompts; if useKnowledge is true include "{{knowledge}}" in a system prompt. The prospect's primary language is ${lang === 'vi' ? 'Vietnamese' : 'English'}.`;
     try {
       const raw = await provider.completeText(system, `Prospect brief:\n${brief}`);

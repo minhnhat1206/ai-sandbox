@@ -1,8 +1,8 @@
-import { Plus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Lang, WorkflowDef } from '@shared/types';
-import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Spinner, Textarea } from '@/components/ui';
+import { Alert, Badge, Button, Field, Input, Modal, SectionHead, Select, Skeleton, Textarea } from '@/components/ui';
+import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { adminApi, type WorkspaceWithStats } from '@/lib/api';
 
@@ -38,28 +38,27 @@ export default function Workspaces() {
   const toggle = (id: string) => setForm((f) => ({ ...f, workflowIds: f.workflowIds.includes(id) ? f.workflowIds.filter((x) => x !== id) : [...f.workflowIds, id] }));
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('ad_nav_workspaces')}</h1>
-        <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> {t('ad_new_ws')}</Button>
-      </div>
+    <div className="space-y-6">
+      <SectionHead title={t('ad_nav_workspaces')} right={<Button onClick={() => setOpen(true)} icon="plus">{t('ad_new_ws')}</Button>} />
       {error && <Alert tone="error">{error}</Alert>}
-      {!list ? <Spinner label={t('loading')} /> : (
-        <Card className="divide-y divide-ink-100">
-          {list.map((w) => (
-            <Link key={w.id} to={`/admin/workspaces/${w.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-ink-50">
+      {!list ? <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div> : (
+        <div className="overflow-hidden rounded-xl2 bg-white hairline shadow-[var(--shadow-card)]">
+          {list.map((w, i) => (
+            <Link key={w.id} to={`/admin/workspaces/${w.id}`} className={`group flex flex-wrap items-center gap-4 px-5 py-4 transition hover:bg-jade-1 ${i > 0 ? 'border-t border-sand-4' : ''}`}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-jade-3 text-[14px] font-bold text-jade-11">{w.company.slice(0, 1).toUpperCase()}</span>
               <div className="min-w-0 flex-1">
-                <p className="font-medium">{w.company} <span className="text-xs text-ink-500">/s/{w.token}</span></p>
-                <p className="text-xs text-ink-500">{w.industry || '—'} · {w.workflowIds.length + w.customWorkflows.length} {t('sb_nav_workflows').toLowerCase()} · {w.credits.used}/{w.credits.total} credits · {new Date(w.updatedAt).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}</p>
+                <p className="flex flex-wrap items-center gap-2 font-semibold text-jade-12">{w.company} <span className="font-mono text-[11px] font-medium text-sand-9">/s/{w.token}</span></p>
+                <p className="text-[12.5px] text-sand-9">{w.industry || '—'} · {w.workflowIds.length + w.customWorkflows.length} {t('sb_nav_workflows').toLowerCase()} · <span className="tnum">{w.credits.used}/{w.credits.total}</span> credits · {new Date(w.updatedAt).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}</p>
               </div>
-              <span className="text-xs text-ink-700">{w.stats.runs} {t('ad_kpi_runs').toLowerCase()} · {w.stats.leads} {t('ad_kpi_leads').toLowerCase()}</span>
-              <Badge tone={STATUS_TONE[w.status]}>{w.status}</Badge>
+              <span className="hidden text-[12.5px] text-sand-10 tnum sm:block"><Icon name="bolt" size={13} className="mr-1 inline text-jade-9" />{w.stats.runs} · <Icon name="inbox" size={13} className="mx-1 inline text-jade-9" />{w.stats.leads}</span>
+              <Badge tone={STATUS_TONE[w.status]} dot>{w.status}</Badge>
+              <Icon name="chevronRight" size={16} className="text-sand-7 transition group-hover:translate-x-0.5 group-hover:text-jade-9" />
             </Link>
           ))}
-        </Card>
+        </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t('ad_new_ws')} wide>
+      <Modal open={open} onClose={() => setOpen(false)} title={t('ad_new_ws')} wide eyebrow={t('ad_nav_workspaces')}>
         <form onSubmit={create} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('ad_ws_company')} required htmlFor="c"><Input id="c" required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></Field>
@@ -71,16 +70,19 @@ export default function Workspaces() {
           </div>
           <Field label={t('ad_ws_brief')} htmlFor="b"><Textarea id="b" rows={4} value={form.brief} onChange={(e) => setForm({ ...form, brief: e.target.value })} /></Field>
           <div>
-            <p className="mb-2 text-sm font-medium">{t('ad_ws_workflows')}</p>
+            <p className="mb-2 text-[13px] font-semibold">{t('ad_ws_workflows')}</p>
             <div className="grid gap-1.5 sm:grid-cols-2">
-              {catalog.map((w) => (
-                <label key={w.id} className="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2 text-sm hover:bg-ink-50">
-                  <input type="checkbox" checked={form.workflowIds.includes(w.id)} onChange={() => toggle(w.id)} /> {pick(w.name)}
-                </label>
-              ))}
+              {catalog.map((w) => {
+                const on = form.workflowIds.includes(w.id);
+                return (
+                  <label key={w.id} className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[13.5px] transition ${on ? 'bg-jade-2 text-jade-12 ring-1 ring-jade-5' : 'bg-sand-2 text-sand-11 hover:bg-sand-3'}`}>
+                    <input type="checkbox" className="accent-jade-9" checked={on} onChange={() => toggle(w.id)} /> <Icon name={w.icon} size={16} className="text-jade-9" /> {pick(w.name)}
+                  </label>
+                );
+              })}
             </div>
           </div>
-          <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t('cancel')}</Button><Button type="submit" loading={busy}>{t('save')}</Button></div>
+          <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t('cancel')}</Button><Button type="submit" loading={busy} icon="check">{t('save')}</Button></div>
         </form>
       </Modal>
     </div>

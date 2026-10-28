@@ -16,3 +16,15 @@ anxious about AI and do not know where to start.
 - Accessibility: labelled inputs (`Field` + `htmlFor`), `role="alert"` for errors,
   keyboard reachable modals (Escape closes), colour never the only signal.
 - Demo mode is always labelled as demo. We never pretend simulated output is real AI.
+
+## Visual system (see docs/DESIGN-SYSTEM.md)
+- Tokens live in `src/index.css` (`jade`, `sand`, `amber`, `coral`, `sky`, `ink`). Never
+  hard-code a hex in a component; never introduce a second accent hue.
+- Icons come only from `src/icons/index.tsx` (`<Icon name>`); draw a new one on the 24px
+  grid (1.75 stroke, round caps, duotone fill at 16% for workflow icons) instead of
+  importing an icon library. Add workflow icon names to `shared/icons.ts`.
+- Illustrations are inline SVG in `src/components/illustrations.tsx`, currentColor-aware.
+- Use `SectionHead`, `Card`, `IconTile`, `Badge`, `Tabs`, `useToast` from `ui.tsx` before
+  writing new primitives; a dark `grain` block is reserved for hero figures and the CTA.
+- Charts follow the dataviz mark specs in `src/components/charts.tsx` (single hue, thin
+  bars, hairline grid, hover tooltip, sr-only table). No pie charts, no dual axes.

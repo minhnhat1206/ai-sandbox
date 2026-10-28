@@ -1,8 +1,9 @@
-import { ArrowRight, Lock, ShieldCheck, Sparkles, Timer } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BRAND_NAME, BRAND_TAGLINE, LangToggle, Logo } from '@/components/Brand';
-import { Button, Card, Input } from '@/components/ui';
+import { BRAND_NAME, BRAND_TAGLINE, LangToggle, Logo } from '@/components/Logo';
+import { HeroPreview, StepArt } from '@/components/illustrations';
+import { Button } from '@/components/ui';
+import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 
 export default function Landing() {
@@ -15,62 +16,82 @@ export default function Landing() {
     if (c) nav(`/s/${encodeURIComponent(c)}`);
   };
   const steps = [
-    { icon: <Sparkles className="h-5 w-5" />, t: t('landing_step1_t'), d: t('landing_step1_d') },
-    { icon: <Timer className="h-5 w-5" />, t: t('landing_step2_t'), d: t('landing_step2_d') },
-    { icon: <ShieldCheck className="h-5 w-5" />, t: t('landing_step3_t'), d: t('landing_step3_d') },
+    { t: t('landing_step1_t'), d: t('landing_step1_d') },
+    { t: t('landing_step2_t'), d: t('landing_step2_d') },
+    { t: t('landing_step3_t'), d: t('landing_step3_d') },
+  ];
+  const trust = [
+    { icon: 'lock', text: t('landing_trust_1') },
+    { icon: 'coins', text: t('landing_trust_2') },
+    { icon: 'docCheck', text: t('landing_trust_3') },
   ];
   return (
     <div className="min-h-screen">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Logo subtitle={BRAND_TAGLINE[lang]} />
-        <div className="flex items-center gap-3">
-          <Link to="/admin" className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"><Lock className="h-3 w-3" /> {t('landing_admin')}</Link>
-          <LangToggle />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 pb-20">
-        <section className="grid gap-10 py-10 md:grid-cols-2 md:items-center md:py-16">
-          <div className="animate-rise">
-            <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-800">
-              <Sparkles className="h-3.5 w-3.5" /> {t('no_account_needed')}
+      {/* ---------------------------------------------------------- hero */}
+      <section className="grain relative overflow-hidden bg-ink-900 text-white">
+        <div className="pointer-events-none absolute inset-0 dotfield-dark opacity-60" />
+        <div className="pointer-events-none absolute -left-40 top-10 h-[520px] w-[520px] rounded-full bg-jade-8/25 blur-[120px]" />
+        <div className="pointer-events-none absolute -right-32 bottom-0 h-[420px] w-[420px] rounded-full bg-amber-9/15 blur-[120px]" />
+        <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+          <Logo tone="light" subtitle={BRAND_TAGLINE[lang]} />
+          <div className="flex items-center gap-3">
+            <Link to="/admin" className="hidden items-center gap-1.5 text-xs text-white/60 transition hover:text-white sm:inline-flex"><Icon name="lock" size={13} /> {t('landing_admin')}</Link>
+            <LangToggle tone="dark" />
+          </div>
+        </header>
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-20 pt-8 md:grid-cols-[1.05fr_1fr] md:items-center md:pb-28 md:pt-14">
+          <div>
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1.5 text-[12px] font-semibold text-jade-4 ring-1 ring-white/12 animate-rise">
+              <Icon name="sparkle" size={14} className="text-amber-6" /> {t('no_account_needed')}
             </p>
-            <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-ink-900 md:text-5xl">{t('landing_title')}</h1>
-            <p className="mt-4 max-w-xl text-lg text-ink-700">{t('landing_sub')}</p>
-            <form onSubmit={submit} className="mt-8 flex max-w-md flex-col gap-2 sm:flex-row">
+            <h1 className="display text-[40px] font-extrabold text-white animate-rise delay-1 md:text-[58px]">{t('landing_title')}</h1>
+            <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-white/70 animate-rise delay-2">{t('landing_sub')}</p>
+            <form onSubmit={submit} className="mt-8 flex max-w-lg flex-col gap-2 animate-rise delay-3 sm:flex-row">
               <label htmlFor="code" className="sr-only">{t('landing_enter_code')}</label>
-              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('landing_code_placeholder')} className="sm:flex-1" />
-              <Button type="submit" size="lg">{t('landing_open')} <ArrowRight className="h-4 w-4" /></Button>
+              <div className="relative flex-1">
+                <Icon name="bolt" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
+                <input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('landing_code_placeholder')} className="h-12 w-full rounded-xl bg-white/10 pl-10 pr-3 text-[15px] text-white placeholder:text-white/40 ring-1 ring-white/15 backdrop-blur transition focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-jade-6" />
+              </div>
+              <Button type="submit" size="lg" className="shrink-0">{t('landing_open')} <Icon name="arrowRight" size={17} /></Button>
             </form>
-            <p className="mt-3 text-sm text-ink-500">
-              <Link to="/s/demo" className="font-medium text-brand-700 underline-offset-2 hover:underline">{t('landing_try_demo')} →</Link>
+            <p className="mt-4 text-sm text-white/60 animate-rise delay-4">
+              <Link to="/s/demo" className="group inline-flex items-center gap-1 font-semibold text-jade-4 transition hover:text-white">{t('landing_try_demo')} <Icon name="arrowRight" size={14} className="transition group-hover:translate-x-0.5" /></Link>
             </p>
           </div>
-          <Card className="p-6 md:p-8">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">{t('landing_how')}</h2>
-            <ol className="mt-4 space-y-5">
-              {steps.map((s, i) => (
-                <li key={i} className="flex gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">{s.icon}</span>
-                  <div>
-                    <p className="font-semibold text-ink-900">{i + 1}. {s.t}</p>
-                    <p className="text-sm text-ink-700">{s.d}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Card>
+          <div className="animate-rise delay-2">
+            <HeroPreview className="w-full drop-shadow-2xl" />
+          </div>
+        </div>
+      </section>
+
+      {/* --------------------------------------------------- how it works */}
+      <main className="mx-auto max-w-6xl px-5 pb-20">
+        <section className="-mt-10 relative z-10">
+          <div className="grid gap-4 md:grid-cols-3">
+            {steps.map((s, i) => (
+              <article key={i} className="hover-lift rounded-xl2 bg-white p-6 hairline shadow-[var(--shadow-card)] animate-rise delay-2">
+                <div className="flex items-center justify-between">
+                  <StepArt step={(i + 1) as 1 | 2 | 3} className="h-16 w-16 text-jade-9" />
+                  <span className="font-mono text-[11px] font-semibold text-sand-8">0{i + 1}</span>
+                </div>
+                <h2 className="mt-4 text-[17px] font-bold tracking-tight text-jade-12">{s.t}</h2>
+                <p className="mt-1.5 text-[14.5px] leading-relaxed text-sand-10">{s.d}</p>
+              </article>
+            ))}
+          </div>
+          <p className="eyebrow mt-4 text-center">{t('landing_how')}</p>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          {[t('landing_trust_1'), t('landing_trust_2'), t('landing_trust_3')].map((s, i) => (
-            <div key={i} className="flex items-start gap-3 rounded-xl border border-ink-100 bg-white p-4 text-sm text-ink-700">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" /> {s}
+        <section className="mt-16 grid gap-3 md:grid-cols-3">
+          {trust.map((s, i) => (
+            <div key={i} className="flex items-start gap-3 rounded-xl bg-white/70 p-4 text-[14px] text-sand-11 hairline">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-jade-3 text-jade-10"><Icon name={s.icon} size={16} /></span>
+              <span className="pt-1">{s.text}</span>
             </div>
           ))}
         </section>
       </main>
-      <footer className="border-t border-ink-100 py-6 text-center text-xs text-ink-500">© {new Date().getFullYear()} {BRAND_NAME} · {BRAND_TAGLINE[lang]}</footer>
+      <footer className="border-t border-sand-4 py-8 text-center text-xs text-sand-9">© {new Date().getFullYear()} {BRAND_NAME} · {BRAND_TAGLINE[lang]}</footer>
     </div>
   );
 }

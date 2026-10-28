@@ -25,7 +25,8 @@ Anthropic credits, rate the results, and book a call. The founder manages everyt
   `data/db.json`, seeded with the demo workspace), `config.ts` (.env loader).
 - `src/` React app. `pages/sandbox/*` prospect flow, `pages/admin/*` founder console,
   `i18n/dict.ts` every UI string in VI + EN, `lib/api.ts` fetch + SSE client,
-  `lib/markdown.tsx` safe renderer.
+  `lib/markdown.tsx` safe renderer, `icons/` the hand-drawn Lumen icon set,
+  `components/` ui kit, logo, illustrations, charts. Design system: `docs/DESIGN-SYSTEM.md`.
 - `.claude/` rules (auto-loaded), skills (`/new-workflow`, `/new-sandbox`,
   `/demo-script`, `/tune-prompt`, `/release-check`), subagents, hooks (guards + checks).
 
