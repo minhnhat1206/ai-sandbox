@@ -2,25 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../server/app.ts';
 import { readConfig } from '../server/config.ts';
 import { MockProvider } from '../server/providers/mock.ts';
-import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult } from '../server/providers/types.ts';
+import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult, Provider } from '../server/providers/types.ts';
 import { Store } from '../server/store.ts';
 import { UploadStore } from '../server/uploads.ts';
 import { estimateCostUsd, typicalRunCostUsd } from '../shared/engine/pricing.ts';
 import type { RunEvent } from '../shared/types.ts';
 
 /** A "real" provider for billing tests: not demo, reports Opus-like token usage with cache reads. */
-class PaidProvider extends MockProvider {
-  override readonly name = 'paid';
-  override readonly model = 'claude-opus-5-5';
-  override readonly isDemo = false;
-  constructor(private readonly usage: CompletionResult) { super(0); }
-  override async complete(req: CompletionRequest, onDelta: (t: string) => void): Promise<CompletionResult> {
-    const r = await super.complete(req, onDelta);
+class PaidProvider implements Provider {
+  readonly name = 'paid';
+  readonly model = 'claude-opus-5-5';
+  readonly isDemo = false;
+  private readonly inner = new MockProvider(0);
+  constructor(private readonly usage: CompletionResult) {}
+  async complete(req: CompletionRequest, onDelta: (t: string) => void): Promise<CompletionResult> {
+    const r = await this.inner.complete(req, onDelta);
     return { ...r, ...this.usage };
   }
-  override async runAgent(req: AgentRequest, hooks: AgentHooks): Promise<CompletionResult> {
-    const r = await super.runAgent(req, hooks);
+  async runAgent(req: AgentRequest, hooks: AgentHooks): Promise<CompletionResult> {
+    const r = await this.inner.runAgent(req, hooks);
     return { ...r, ...this.usage };
+  }
+  completeText(system: string, user: string): Promise<string> {
+    return this.inner.completeText(system, user);
   }
 }
 
