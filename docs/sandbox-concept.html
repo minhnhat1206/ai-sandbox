@@ -369,6 +369,39 @@ code, .mono { font-family: var(--f-mono); font-size: .86em; }
 .phase.next { border-style: dashed; background: var(--paper); }
 .phase .todo { font-size: 12px; color: var(--amber); font-weight: 600; }
 
+
+/* ---------- why ---------- */
+.wrap > .why { margin-bottom: 16px; }
+.why { border-radius: var(--r); background: var(--amber-wash); border: 1px solid var(--amber-line); padding: 14px 16px; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+.why .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--sheet); color: var(--amber); }
+.why b.wl { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--amber); margin-bottom: 3px; }
+.why p { font-size: 14px; color: var(--ink); line-height: 1.55; max-width: 92ch; }
+.why ul { display: grid; gap: 4px; margin-top: 6px; }
+.why li { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 6px; }
+.why li::before { content: "→"; color: var(--amber); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 26px; }
+@media (max-width: 760px) { .stats { grid-template-columns: 1fr; } }
+.stat { background: var(--sheet); border: 1px solid var(--grid); border-radius: var(--r-lg); padding: 16px; display: grid; gap: 6px; align-content: start; }
+.stat b { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--jade-deep); font-variant-numeric: tabular-nums; }
+.stat p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.stat .so { font-size: 12.5px; color: var(--jade-ink); font-weight: 600; }
+.reasons { display: grid; gap: 10px; }
+.reason { display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); gap: 10px; align-items: stretch; }
+@media (max-width: 820px) { .reason { grid-template-columns: 1fr; } .reason .to { transform: rotate(90deg); justify-self: start; margin-left: 14px; } }
+.reason > div { border-radius: var(--r); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.reason .prob { background: var(--sheet); border: 1px solid var(--grid); }
+.reason .prob small { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--coral); }
+.reason .prob b { font-size: 14px; color: var(--ink); line-height: 1.35; }
+.reason .prob span { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+.reason .sol { background: var(--jade-wash); border: 1px solid var(--jade-line); }
+.reason .sol small { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--jade-ink); }
+.reason .sol b { font-size: 14px; color: var(--jade-deep); line-height: 1.35; }
+.reason .sol span { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.reason .sol a { font-size: 12px; font-weight: 600; }
+.reason .to { display: grid; place-items: center; color: var(--jade); }
+.phase .whynow { font-size: 12.5px; color: var(--ink); background: var(--amber-wash); border-radius: 8px; padding: 7px 9px; line-height: 1.45; }
+.phase .whynow b { color: var(--amber); }
+
 footer.foot { padding-block: 26px 40px; border-top: 1px solid var(--grid); font-size: 12.5px; color: var(--ink-3); background: var(--sheet); }
 footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 </style>
@@ -407,6 +440,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
     <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 9.5L12 4l9 5.5z"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3.5 20h17"/></symbol>
     <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5z"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
     <symbol id="i-mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#137a62" stroke="none"/><path d="M9 23c0-9 6-14 14-15-1 8-5 14-14 15z" fill="#ffffff" stroke="none"/><circle cx="23" cy="8.5" r="2.2" fill="#f4c15d" stroke="none"/></symbol>
   </defs>
 </svg>
@@ -418,6 +452,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <span><b>AI Sandbox</b><small>Working name · product blueprint</small></span>
     </a>
     <nav aria-label="Sections">
+      <a href="#why">Why</a>
       <a href="#journey">Journey</a>
       <a href="#screen">The screen</a>
       <a href="#architecture">Architecture</a>
@@ -467,6 +502,62 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
   </div>
 </section>
 
+
+<!-- ===================== WHY ===================== -->
+<section class="band" id="why" aria-labelledby="w-title">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">Why this product exists</p>
+      <h2 id="w-title">Every feature answers a problem we heard or a decision we made</h2>
+      <p class="lead">Our business sells AI training and builds AI assistants for Vietnamese companies. The hardest moment is the first one: a business owner who has never used AI has to believe it will work for their company before paying anything. The sandbox exists to make that first yes cheap, safe and convincing.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>74%</b><p>of Vietnamese firms that use AI use it only at a basic level.</p><span class="so">So: show real work done by agents, not a chatbot demo.</span></div>
+      <div class="stat"><b>54%</b><p>of Vietnamese firms say skills are the main barrier to AI.</p><span class="so">So: the paid step is a hands-on team Kickstart.</span></div>
+      <div class="stat"><b>78%</b><p>of AI users bring their own AI tools to work (global figure).</p><span class="so">So: safe use and data rules are part of every pitch.</span></div>
+    </div>
+    <p class="cap" style="margin:-14px 0 22px">Sources cited in our business plan: e-Conomy SEA 2025 (Vietnam figures) and Microsoft Work Trend Index (78%, global and Australia).</p>
+
+    <div class="reasons">
+      <div class="reason">
+        <div class="prob"><small>Problem</small><b>Prospects have no AI account and don't know where to start.</b><span>Buying a plan, entering a card and setting permissions stops them before they see any value.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>An invite link that opens a ready sandbox</b><span>No sign-up, two clicks per page (“Use sample data”, then “Run”), our API key and credits behind it.</span><a href="#screen">See the screen</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Problem</small><b>A free chatbot already answers questions. Why pay us?</b><span>Owners are only impressed when AI does a job they recognise, with their kind of numbers.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>21 agents that read data, produce files and prepare actions</b><span>Each one meets five criteria: real data, an action, a deliverable, measurable time saved, a link to a role or to our own offer.</span><a href="#run">See one run</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Decision</small><b>No real customer data before a contract is signed.</b><span>Owners fear data leaks, and Decree 13 / Law 91/2025 make handling personal data a legal matter.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>The synthetic data studio</b><span>Fake but believable data in the prospect’s own structure, so the demo feels like their company without touching their data.</span><a href="#data">See the data studio</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Decision</small><b>First customers are acquaintances in any industry; the engineer has 2–4 hours per prospect.</b><span>Writing CSV files by hand for each new industry took most of a day. Demo data from a food distributor does not convince a packaging factory.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>Industry presets, AI-proposed profiles and pasted headers</b><span>A new industry in under 2 hours, with every agent still working on the generated tables.</span><a href="#data">See the data model</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Decision</small><b>The decision maker tries it personally, and the next step is a report to them.</b><span>A good trial is forgotten in a week unless there is something concrete to forward and decide on.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>The decision-maker report with a Kickstart button</b><span>Hours saved and findings from their own runs, a priced offer, and a lead the moment they say yes.</span><a href="#report">See the report</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Risk</small><b>A public link spends our money.</b><span>Guessable links, scripts hammering the API, or one curious prospect running everything 50 times would burn credits.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>Random links, rate limits and a USD 10 cap per company</b><span>USD 10 is the most we accept to spend to win one Kickstart, so the server enforces it.</span><a href="#security">See the controls</a></div>
+      </div>
+      <div class="reason">
+        <div class="prob"><small>Constraint</small><b>Year 1 of the business plan says: do not build our own AI platform.</b><span>The engineer has 5–10 hours a week. Platform work must stay small and serve sales directly.</span></div>
+        <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+        <div class="sol"><small>So we built</small><b>One Node process, a JSON file store, workflows as data</b><span>Nothing to operate beyond one small server; new agents are added as data, not screens.</span><a href="#architecture">See the architecture</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===================== JOURNEY ===================== -->
 <section class="band" id="journey" aria-labelledby="j-title">
   <div class="wrap">
@@ -495,6 +586,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <h2 id="s-title">A gallery of agents, a visible plan, a finished deliverable</h2>
       <p class="lead">This is the debt-collection agent on the demo data (16 invoices, as of 28 Oct 2026). The figures are the real output of the run and are checked by the automated tests.</p>
     </div>
+    <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>The page is designed for a finance clerk or a warehouse supervisor who has never used AI and may be nervous about it. Everything works in two clicks, results stream in within a second so nobody stares at a spinner, and the agent shows each step it took so the result can be trusted.</p><ul><li>Time saved is shown in minutes, never in tokens or dollars, because that is what an owner cares about.</li><li>Every result ends with a rating and “Want this for your team?”, our path to a sale.</li><li>Demo mode is always labelled, so we never pretend simulated output is real AI.</li></ul></div></div>
     <figure class="window" style="margin:0" aria-label="Mock-up of the sandbox screen during a debt-collection run">
       <div class="chrome" aria-hidden="true"><i></i><i></i><i></i><span class="url">sandbox.your-firm.vn/s/viet-minh-k3m9q2xp/run/receivables-agent</span></div>
       <div class="screen">
@@ -554,6 +646,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
     </div>
 
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>We need something one engineer can run in a few hours a week, that keeps our API key off the browser, and that still uses Claude’s full abilities (tools, files, web search, connectors).</p><ul><li>The server does every model call, so the key and the budget stay under our control.</li><li>A mock provider runs the same tools without a key, so demos work offline and tests cost nothing.</li><li>No database server or queue: the business plan rules out a platform build in year 1.</li></ul></div></div>
+
       <p class="scroll-hint">Scroll sideways to see the whole diagram.</p>
       <div class="scroll" role="region" aria-label="Architecture diagram" tabindex="0">
         <div class="arch">
@@ -607,6 +701,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
     </div>
 
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>Prospects only believe a number they can trace. Showing the agent’s plan step by step (what it read, what it calculated, what it drafted) turns “AI said so” into “AI did this work, here is how”.</p><ul><li>Credits are deducted before the run and refunded on failure, so the cost cap cannot be bypassed and failures cost the prospect nothing.</li><li>Actions are drafts in an outbox: we demonstrate value without ever emailing a real person.</li></ul></div></div>
+
       <p class="scroll-hint">Scroll sideways to see the whole sequence.</p>
       <div class="scroll" role="region" aria-label="Sequence diagram of one run, 12 messages" tabindex="0">
         <div class="seq">
@@ -667,6 +763,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
     </div>
 
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>Agents look impressive only on data that resembles the prospect’s business, but we promised not to take real data before a contract. Hand-writing believable data for each new industry took most of a day; the founder’s first prospects come from any industry, and the engineer has 2–4 hours per sandbox.</p><ul><li>Same table structure in every industry, so all 21 agents keep working.</li><li>Planted situations (a late order, a duplicate payment) guarantee every demo finds something worth acting on.</li><li>Pasting the prospect’s own column headers makes them recognise their own files on screen.</li></ul></div></div>
+
       <div class="pipeline">
         <div class="st"><h4>What we know</h4>
           <ul><li>Industry and call notes</li><li>Pasted column headers from their templates</li><li>Screenshots of their software, PDFs, empty CSVs</li></ul>
@@ -724,6 +822,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <p class="lead">Built from what actually happened in the sandbox, edited by the founder, read by the boss on a phone. One button turns a “yes” into a lead.</p>
     </div>
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>In the interview, the founder chose “a report sent to the boss” as the step that turns a trial into a sale. Without it, a good trial fades in a week. The report gives the decision maker something concrete to read, forward and approve.</p><ul><li>Figures are computed from real runs, never invented by AI, so the founder can stand behind every number.</li><li>View tracking tells the founder when to call; the Kickstart button turns a yes into a lead at once.</li></ul></div></div>
+
       <div class="rflow">
         <div class="chain">
           <div class="link-row"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg></span><div><b>Runs and ratings</b><p>Every finished run: workflow, minutes saved, deliverables, actions, stars, written feedback.</p></div></div>
@@ -763,6 +863,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <p class="lead">A public link with our API key behind it needs several layers. Each one below is implemented and covered by tests.</p>
     </div>
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>Each sandbox is a public link with our credit card behind it, and our clients are subject to Vietnam’s data-protection and AI laws. One leaked or guessed link, or one script, could cost real money or trust.</p><ul><li>USD 10 per company is the most we accept to spend to win a Kickstart, so it is a hard server-side cap.</li><li>Showing prospects that we follow Decree 13 and Law 91/2025 is itself part of the sales argument.</li></ul></div></div>
+
       <div class="layers">
         <div class="layer"><div class="lh"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-link"/></svg></span><b>Links are secrets</b></div>
           <ul><li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Invite link = readable prefix + <b>8 random characters</b> (about 40 bits). Custom codes need 12+ characters.</span></li><li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Report link = <b>16 random characters</b> (about 80 bits), private until published.</span></li><li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>“New link” rotates the token and the old one stops working at once. Links expire after <b>30 days</b> by default.</span></li><li><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span><code>Referrer-Policy: no-referrer</code>, so tokens never leak to other sites.</span></li></ul></div>
@@ -800,6 +902,8 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <p class="lead">A single small VPS (1 vCPU, 1 GB RAM) serves dozens of prospects. Hosting in Vietnam keeps the data-protection story simple; Singapore gives lower latency to Anthropic.</p>
     </div>
     <div class="plate">
+      <div class="why"><span class="tile"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg></span><div><b class="wl">Why we built this</b><p>A link on localhost cannot be sent to a prospect. We need HTTPS, automatic restarts and backups so that a prospect’s results are never lost, on a setup cheap and simple enough for one engineer.</p><ul><li>Checking all 21 agents against real Claude before launch avoids embarrassing failures in front of the founder’s own network, and tells us the real cost per run.</li></ul></div></div>
+
       <p class="scroll-hint">Scroll sideways to see the whole diagram.</p>
       <div class="scroll" role="region" aria-label="Deployment diagram" tabindex="0">
         <div class="deploy">
@@ -837,10 +941,10 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <p class="lead">The engineer has 5–10 hours a week; Claude Code writes most of the code and the engineer reviews it. Stop rule: if fewer than 2 of the first 10 sandboxes buy a Kickstart, we fix targeting and the invitation before building more.</p>
     </div>
     <div class="plan">
-      <div class="phase"><span class="ph">Phase 1</span><h3>Ready for real prospects</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Random links, rate limits, admin lockout, daily backups, deploy guide, real-Claude check script.</p><p class="todo">To do: add the API key, run real-check, rent the server.</p></div>
-      <div class="phase"><span class="ph">Phase 2</span><h3>Synthetic data studio</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Notes, headers and screenshots in; 11 tables, 6 documents and re-pointed samples out. Every agent tested on generated data.</p><p class="todo">To do: try it with 1–2 real acquaintances.</p></div>
-      <div class="phase"><span class="ph">Phase 3</span><h3>Report for the boss</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Built from runs, edited, published at <code>/r/…</code>, view tracking, a Kickstart button that creates a lead.</p><p class="todo">To do: confirm the Kickstart price and company name.</p></div>
-      <div class="phase next"><span class="ph">Phase 4</span><h3>Classroom mode</h3><span class="chip st-next"><svg class="i s16" aria-hidden="true"><use href="#i-hours"/></svg>Next</span><p>Sessions with QR join, exercises graded by AI, free chat, a live facilitator board, before/after survey, a per-session budget.</p><p class="todo">Goal: one internal pilot with 5–10 people.</p></div>
+      <div class="phase"><span class="ph">Phase 1</span><h3>Ready for real prospects</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Random links, rate limits, admin lockout, daily backups, deploy guide, real-Claude check script.</p><p class="whynow"><b>Why:</b> Without HTTPS, random links and a cost cap, no link could be sent to a real prospect.</p><p class="todo">To do: add the API key, run real-check, rent the server.</p></div>
+      <div class="phase"><span class="ph">Phase 2</span><h3>Synthetic data studio</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Notes, headers and screenshots in; 11 tables, 6 documents and re-pointed samples out. Every agent tested on generated data.</p><p class="whynow"><b>Why:</b> Building each sandbox by hand would not fit 2–4 hours per prospect, in any industry.</p><p class="todo">To do: try it with 1–2 real acquaintances.</p></div>
+      <div class="phase"><span class="ph">Phase 3</span><h3>Report for the boss</h3><span class="chip jade"><svg class="i s16" aria-hidden="true"><use href="#i-check"/></svg>Built</span><p>Built from runs, edited, published at <code>/r/…</code>, view tracking, a Kickstart button that creates a lead.</p><p class="whynow"><b>Why:</b> It is the conversion step the founder chose: no report, no Kickstart.</p><p class="todo">To do: confirm the Kickstart price and company name.</p></div>
+      <div class="phase next"><span class="ph">Phase 4</span><h3>Classroom mode</h3><span class="chip st-next"><svg class="i s16" aria-hidden="true"><use href="#i-hours"/></svg>Next</span><p>Sessions with QR join, exercises graded by AI, free chat, a live facilitator board, before/after survey, a per-session budget.</p><p class="whynow"><b>Why:</b> Kickstart is in person: staff join by QR, and the facilitator needs a live board and before/after proof.</p><p class="todo">Goal: one internal pilot with 5–10 people.</p></div>
     </div>
   </div>
 </section>
