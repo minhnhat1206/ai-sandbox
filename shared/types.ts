@@ -145,6 +145,10 @@ export interface Workspace {
   dataSources: DataSource[];
   mcpServers: McpServer[];
   credits: { total: number; used: number };
+  /** Hard USD cap for this prospect's trial; runs are refused once spent >= budget. */
+  budgetUsd: number;
+  /** Sum of costUsd over this workspace's runs. */
+  spentUsd: number;
   status: WorkspaceStatus;
   notes: string;
   createdAt: string;
@@ -218,6 +222,7 @@ export interface RunStepResult {
   output: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
   durationMs: number;
 }
 
@@ -240,6 +245,8 @@ export interface Run {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /** Part of inputTokens served from the prompt cache (billed at the cache-read rate). */
+  cacheReadTokens: number;
   costUsd: number;
   minutesSaved: number;
   trace: ToolCall[];
@@ -278,6 +285,8 @@ export interface SandboxView {
   connectors: string[];
   creditsRemaining: number;
   creditsTotal: number;
+  /** True when the trial budget is used up (USD figures are never shown to prospects). */
+  budgetExhausted: boolean;
   provider: { name: string; model: string; isDemo: boolean };
 }
 
@@ -303,6 +312,7 @@ export interface AdminOverview {
   avgRating: number | null;
   creditsUsed: number;
   costUsd: number;
+  budgetUsd: number;
   provider: { name: string; model: string; isDemo: boolean };
   recentRuns: Run[];
   recentLeads: Lead[];

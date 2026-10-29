@@ -80,6 +80,8 @@ function viaStore(): Workspace {
     mcpServers: [],
     knowledge: Array.isArray(payload.knowledge) ? (payload.knowledge as { title: string; content: string }[]).map((k) => ({ id: `kd_${shortId(6)}`, title: k.title, content: k.content, updatedAt: ts })) : [],
     credits: { total: Number(payload.credits ?? 50), used: 0 },
+    budgetUsd: Number(payload.budgetUsd ?? cfg.defaultBudgetUsd),
+    spentUsd: 0,
     status: 'active',
     notes: String(payload.notes ?? ''),
     createdAt: ts,
@@ -92,4 +94,4 @@ function viaStore(): Workspace {
 
 const ws = (await viaApi()) ?? viaStore();
 console.log(`Sandbox ready: ${base}/s/${ws.token}`);
-console.log(`  id=${ws.id} workflows=${ws.workflowIds.length}+${ws.customWorkflows.length} custom, knowledge=${ws.knowledge.length}, credits=${ws.credits.total}`);
+console.log(`  id=${ws.id} workflows=${ws.workflowIds.length}+${ws.customWorkflows.length} custom, knowledge=${ws.knowledge.length}, credits=${ws.credits.total}, budget=$${ws.budgetUsd}`);

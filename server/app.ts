@@ -6,6 +6,7 @@ import path from 'node:path';
 import { CATALOG } from '../shared/catalog/index.ts';
 import { parseCsv } from '../shared/engine/csv.ts';
 import { validateWorkflow } from '../shared/engine/validate.ts';
+import { typicalRunCostUsd } from '../shared/engine/pricing.ts';
 import { WORKFLOW_ICONS } from '../shared/icons.ts';
 import { sampleInputs } from '../shared/engine/template.ts';
 import type { AdminOverview, Artifact, ChatMessage, DataSource, Lang, Lead, LeadType, McpServer, Run, RunEvent, SandboxView, Workspace, WorkspaceStatus } from '../shared/types.ts';
@@ -46,8 +47,18 @@ function publicView(ws: Workspace, provider: Provider): SandboxView {
     connectors: (ws.mcpServers ?? []).map((m) => m.name),
     creditsRemaining: Math.max(0, ws.credits.total - ws.credits.used),
     creditsTotal: ws.credits.total,
+    budgetExhausted: budgetExhausted(ws, provider),
     provider: providerInfo(provider),
   };
+}
+
+/** Stop slightly before the cap: a run that would likely cross it is refused. Demo runs cost nothing. */
+function budgetExhausted(ws: Workspace, provider: Provider, agent = false): boolean {
+  if (provider.isDemo) return false;
+  const budget = typeof ws.budgetUsd === 'number' ? ws.budgetUsd : 0;
+  if (budget <= 0) return false;
+  const spent = ws.spentUsd ?? 0;
+  return spent >= budget || spent + typicalRunCostUsd(provider.model, agent) * 0.5 > budget;
 }
 
 function sanitizeInputs(raw: unknown): Record<string, string> {
@@ -120,6 +131,7 @@ export function createApp(deps: AppDeps): Hono {
     if (wf.kind !== kind) return c.json({ error: 'Wrong workflow kind', code: 'wrong_kind' }, 400);
     const remaining = ws.credits.total - ws.credits.used;
     if (remaining <= 0) return c.json({ error: 'No credits left in this sandbox', code: 'no_credits' }, 402);
+    if (budgetExhausted(ws, provider, wf.steps.some((s) => !!s.agent))) return c.json({ error: 'The trial budget for this sandbox is used up', code: 'no_budget' }, 402);
 
     const lang = asLang(body.lang, ws.language);
     const sessionId = str(body.sessionId, 64) || `anon_${shortId(6)}`;
@@ -154,6 +166,9 @@ export function createApp(deps: AppDeps): Hono {
           ? await runWorkflow({ workspace: ws, workflow: wf, inputs, lang, sessionId, visitorName }, provider, emit, common)
           : await runChat({ workspace: ws, workflow: wf, messages, lang, sessionId, visitorName }, provider, emit, common);
         persist(run);
+        ws.spentUsd = Math.round(((ws.spentUsd ?? 0) + run.costUsd) * 1e6) / 1e6;
+        ws.updatedAt = nowIso();
+        store.upsertWorkspace(ws);
         await emit({ type: 'run.done', run, creditsRemaining: ws.credits.total - ws.credits.used });
       } catch (err) {
         ws.credits.used = Math.max(0, ws.credits.used - 1);
@@ -275,6 +290,7 @@ export function createApp(deps: AppDeps): Hono {
       avgRating: rated.length ? Math.round((rated.reduce((n, r) => n + (r.rating ?? 0), 0) / rated.length) * 10) / 10 : null,
       creditsUsed: workspaces.reduce((n, w) => n + w.credits.used, 0),
       costUsd: Math.round(runs.reduce((n, r) => n + r.costUsd, 0) * 10000) / 10000,
+      budgetUsd: Math.round(workspaces.reduce((n, w) => n + (w.budgetUsd ?? 0), 0) * 100) / 100,
       provider: providerInfo(provider),
       recentRuns: runs.slice(0, 8),
       recentLeads: leads.slice(0, 8),
@@ -318,6 +334,8 @@ export function createApp(deps: AppDeps): Hono {
       dataSources: [],
       mcpServers: [],
       credits: { total: Math.min(10000, Math.max(1, Number(body.credits) || 50)), used: 0 },
+      budgetUsd: typeof body.budgetUsd === 'number' ? Math.min(1000, Math.max(0, body.budgetUsd)) : config.defaultBudgetUsd,
+      spentUsd: 0,
       status: (['draft', 'active'].includes(str(body.status)) ? str(body.status) : 'active') as WorkspaceStatus,
       notes: str(body.notes, 4000),
       createdAt: ts,
@@ -400,6 +418,7 @@ export function createApp(deps: AppDeps): Hono {
       if (typeof cr.total === 'number') ws.credits.total = Math.min(10000, Math.max(0, Math.floor(cr.total)));
       if (typeof cr.used === 'number') ws.credits.used = Math.max(0, Math.floor(cr.used));
     }
+    if (typeof body.budgetUsd === 'number') ws.budgetUsd = Math.min(1000, Math.max(0, body.budgetUsd));
     if (body.expiresAt === null) delete ws.expiresAt;
     else if (typeof body.expiresAt === 'string' && !Number.isNaN(Date.parse(body.expiresAt))) ws.expiresAt = new Date(body.expiresAt).toISOString();
     ws.updatedAt = nowIso();

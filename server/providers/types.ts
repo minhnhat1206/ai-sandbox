@@ -17,6 +17,7 @@ export interface CompletionResult {
   text: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
 }
 
 export interface AgentRequest extends CompletionRequest {

@@ -99,7 +99,7 @@ describe('public sandbox API', () => {
   });
 
   it('accepts feedback and leads', async () => {
-    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'weekly-report', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, costUsd: 0, minutesSaved: 10, trace: [], artifacts: [], actions: [], startedAt: '' };
+    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'weekly-report', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0, minutesSaved: 10, trace: [], artifacts: [], actions: [], startedAt: '' };
     store.upsertRun(run);
     const fb = await app.request('/api/sandbox/demo/runs/run_x/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating: 5, feedback: 'great' }) });
     expect(fb.status).toBe(200);

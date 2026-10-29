@@ -12,10 +12,10 @@ export interface DB {
 
 /** Fill fields added after the first release so older db.json files keep working. */
 function migrateWorkspace(ws: Workspace): Workspace {
-  return { ...ws, dataSources: ws.dataSources ?? [], mcpServers: ws.mcpServers ?? [], customWorkflows: ws.customWorkflows ?? [], knowledge: ws.knowledge ?? [], overrides: ws.overrides ?? {} };
+  return { ...ws, budgetUsd: typeof ws.budgetUsd === 'number' ? ws.budgetUsd : 10, spentUsd: typeof ws.spentUsd === 'number' ? ws.spentUsd : 0, dataSources: ws.dataSources ?? [], mcpServers: ws.mcpServers ?? [], customWorkflows: ws.customWorkflows ?? [], knowledge: ws.knowledge ?? [], overrides: ws.overrides ?? {} };
 }
 function migrateRun(run: Run): Run {
-  return { ...run, trace: run.trace ?? [], artifacts: run.artifacts ?? [], actions: run.actions ?? [] };
+  return { ...run, cacheReadTokens: run.cacheReadTokens ?? 0, trace: run.trace ?? [], artifacts: run.artifacts ?? [], actions: run.actions ?? [] };
 }
 
 function emptyDb(): DB {

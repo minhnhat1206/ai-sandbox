@@ -26,6 +26,8 @@ export interface Config {
   adminTokenIsDefault: boolean;
   dataDir: string;
   port: number;
+  /** Default USD cap for a new sandbox. */
+  defaultBudgetUsd: number;
 }
 
 export const DEFAULT_ADMIN_TOKEN = 'change-me';
@@ -47,5 +49,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     adminTokenIsDefault: adminToken === DEFAULT_ADMIN_TOKEN,
     dataDir: env.DATA_DIR || './data',
     port: Number(env.PORT ?? 3000),
+    defaultBudgetUsd: Math.max(0, Number(env.DEFAULT_BUDGET_USD) || 10),
   };
 }

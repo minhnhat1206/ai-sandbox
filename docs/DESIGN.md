@@ -79,6 +79,13 @@ Khách không chỉ "hỏi AI"; họ cần AI **làm việc trong hệ thống c
 
 Quy tắc an toàn: tool chỉ chạy server-side với input được kiểm tra; `calculate` chỉ nhận biểu thức số; artifact HTML phục vụ với `Content-Security-Policy: default-src 'none'` và iframe `sandbox=""`; hành động chỉ mô phỏng. Chi tiết trong `.claude/rules/03-workflows.md`.
 
+## 4c. Trần chi phí mỗi khách (10 USD) và cổng chuyển đổi
+- Mỗi sandbox có `budgetUsd` (mặc định `DEFAULT_BUDGET_USD=10`) và `spentUsd` cộng dồn từ `costUsd` của từng run (token mới × giá vào + token cache × 0,2 USD/1M + token ra × giá ra).
+- Server từ chối chạy (`402 no_budget`) khi đã chạm trần hoặc khi lượt tiếp theo nhiều khả năng vượt trần (một nửa chi phí điển hình của loại run đó). Credit không bị trừ cho lượt bị từ chối.
+- Khách **không bao giờ thấy USD**; khi hết trần họ thấy thông điệp "Bạn đã dùng hết gói dùng thử" kèm nút *Đặt lịch trao đổi*. Form hợp tác vẫn hoạt động không cần credit.
+- Founder thấy thanh ngân sách ở danh sách sandbox và tab Thông tin; nút *Nâng trần +10 USD* mở lại sandbox khi khách đồng ý đi tiếp (Kickstart / Assessment).
+- Chế độ demo (mock) miễn phí nên không bao giờ chạm trần.
+
 ## 5. Thư viện quy trình (19)
 ### Agent (8, xếp đầu gallery)
 | id | Phòng ban | Tool | Sản phẩm |

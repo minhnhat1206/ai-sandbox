@@ -40,7 +40,8 @@ Anthropic credits, rate the results, and book a call. The founder manages everyt
 - New UI strings go in `src/i18n/dict.ts` with both `vi` and `en`.
 - Workflows are data (`WorkflowDef`), validated by `npm run validate:catalog`. Agent steps
   declare `agent.tools`; prospects see the tool timeline, deliverables and actions.
-- Model default `claude-opus-5-5`, effort `medium` (`.env`). One run = one credit.
+- Model default `claude-opus-5-5`, effort `medium` (`.env`). One run = one credit, and each
+  sandbox has a USD cap (`budgetUsd`, default `DEFAULT_BUDGET_USD=10`) enforced server-side.
 - Never read/edit `.env` or `data/db.json` by hand (hooks block it).
 
 ## Definition of done

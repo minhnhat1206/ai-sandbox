@@ -122,7 +122,7 @@ export const adminApi = {
   catalog: () => request<{ workflows: WorkflowDef[] }>('/api/admin/catalog', {}, getAdminToken()),
   workspaces: () => request<{ workspaces: WorkspaceWithStats[] }>('/api/admin/workspaces', {}, getAdminToken()),
   workspace: (id: string) => request<{ workspace: Workspace; resolved: WorkflowDef[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}`, {}, getAdminToken()),
-  createWorkspace: (data: Omit<Partial<Workspace>, 'credits'> & { credits?: number }) => request<{ workspace: Workspace }>('/api/admin/workspaces', { method: 'POST', body: JSON.stringify(data) }, getAdminToken()),
+  createWorkspace: (data: Omit<Partial<Workspace>, 'credits'> & { credits?: number; budgetUsd?: number }) => request<{ workspace: Workspace }>('/api/admin/workspaces', { method: 'POST', body: JSON.stringify(data) }, getAdminToken()),
   updateWorkspace: (id: string, data: Record<string, unknown>) =>
     request<{ workspace: Workspace; resolved: WorkflowDef[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }, getAdminToken()),
   deleteWorkspace: (id: string) => request<{ ok: true }>(`/api/admin/workspaces/${encodeURIComponent(id)}`, { method: 'DELETE' }, getAdminToken()),

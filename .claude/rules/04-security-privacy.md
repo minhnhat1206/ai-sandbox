@@ -10,7 +10,9 @@
 - Prospect inputs may contain personal data. Store only what the feature needs, and
   make sure the data-processing note in the UI stays true (`landing_trust_1`).
 - Credits are deducted server-side before a run starts and refunded on provider error.
-  Never trust a client-side credit count.
+  Never trust a client-side credit count. The USD budget (`budgetUsd` / `spentUsd`) is
+  enforced server-side too (`budgetExhausted()` in `server/app.ts`); USD never reaches
+  prospect pages, only the `budgetExhausted` flag.
 - Vietnam's personal data protection law (Decree 13 / Law 91/2025) and AI Law apply to
   our clients: do not add features that profile individuals or make automated decisions
   about people (hiring, credit, medical) without an explicit human-review step.

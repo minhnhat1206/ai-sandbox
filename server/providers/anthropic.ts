@@ -82,7 +82,7 @@ export class AnthropicProvider implements Provider {
       }
       const final = await stream.finalMessage();
       if (final.stop_reason === 'refusal') throw new ProviderError('The model declined this request for safety reasons.', 'refusal');
-      return { text, inputTokens: countInput(final.usage), outputTokens: final.usage.output_tokens ?? 0 };
+      return { text, inputTokens: countInput(final.usage), outputTokens: final.usage.output_tokens ?? 0, cacheReadTokens: final.usage.cache_read_input_tokens ?? 0 };
     } catch (err) {
       throw toProviderError(err);
     }
@@ -125,6 +125,7 @@ export class AnthropicProvider implements Provider {
     let text = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheReadTokens = 0;
     let container: string | undefined;
     try {
       for (let turn = 0; turn < req.maxTurns + 2; turn++) {
@@ -152,6 +153,7 @@ export class AnthropicProvider implements Provider {
         const message = await stream.finalMessage();
         inputTokens += countInput(message.usage);
         outputTokens += message.usage.output_tokens ?? 0;
+        cacheReadTokens += message.usage.cache_read_input_tokens ?? 0;
         if (message.container?.id) container = message.container.id;
         await this.collectFiles(message, hooks);
 
@@ -176,7 +178,7 @@ export class AnthropicProvider implements Provider {
         }
         messages.push({ role: 'user', content: results });
       }
-      return { text: text.trim(), inputTokens, outputTokens };
+      return { text: text.trim(), inputTokens, outputTokens, cacheReadTokens };
     } catch (err) {
       throw toProviderError(err);
     }

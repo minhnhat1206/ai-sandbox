@@ -39,7 +39,7 @@ Output: a live sandbox at `/s/<token>` plus a demo script.
    ```json
    {
      "company": "ABC Logistics", "industry": "3PL, 300 staff, Bình Dương", "language": "vi",
-     "contactName": "Chị Hoa", "contactEmail": "hoa@abc.example", "credits": 60,
+     "contactName": "Chị Hoa", "contactEmail": "hoa@abc.example", "credits": 60, "budgetUsd": 10,
      "brief": "HQ in Japan pushes AI... pains: ...",
      "workflowIds": ["company-assistant", "customer-reply", "weekly-report", "policy-assistant"],
      "knowledge": [{ "title": "Chính sách giao hàng", "content": "..." }],

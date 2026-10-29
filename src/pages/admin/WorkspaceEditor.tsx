@@ -66,7 +66,7 @@ export default function WorkspaceEditor() {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-jade-12 text-[20px] font-bold text-white">{ws.company.slice(0, 1).toUpperCase()}</span>
           <div>
             <h1 className="display text-[26px] font-bold text-jade-12 md:text-[30px]">{ws.company}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-sand-9">{ws.industry || '—'} <Badge tone={STATUS_TONE[ws.status]} dot>{ws.status}</Badge> <span className="tnum">{ws.credits.used}/{ws.credits.total} credits</span></p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-sand-9">{ws.industry || '—'} <Badge tone={STATUS_TONE[ws.status]} dot>{ws.status}</Badge> <span className="tnum">{ws.credits.used}/{ws.credits.total} credits</span> <span className="tnum">· ${(ws.spentUsd ?? 0).toFixed(2)} / ${(ws.budgetUsd ?? 0).toFixed(0)}</span></p>
           </div>
         </div>
         <ShareBox token={ws.token} />
@@ -90,6 +90,20 @@ export default function WorkspaceEditor() {
   );
 }
 
+export function BudgetMeter({ spent, budget, label, compact }: { spent: number; budget: number; label: string; compact?: boolean }) {
+  const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  const tone = pct >= 100 ? 'bg-coral-9' : pct >= 80 ? 'bg-amber-9' : 'bg-jade-8';
+  return (
+    <div className={compact ? 'min-w-[140px]' : 'mt-3'}>
+      <div className="flex items-center justify-between text-[11.5px] text-sand-10 tnum">
+        <span>{label}: <strong className="text-sand-12">${spent.toFixed(2)}</strong> / ${budget.toFixed(0)}</span>
+        <span className={pct >= 100 ? 'font-semibold text-coral-11' : ''}>{pct}%</span>
+      </div>
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-jade-3"><div className={`h-full rounded-full transition-[width] duration-500 ${tone}`} style={{ width: `${pct}%` }} /></div>
+    </div>
+  );
+}
+
 function ShareBox({ token }: { token: string }) {
   const { t } = useLang();
   const toast = useToast();
@@ -107,10 +121,10 @@ function ShareBox({ token }: { token: string }) {
 
 function GeneralTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
   const { t } = useLang();
-  const [f, setF] = useState({ company: ws.company, industry: ws.industry, contactName: ws.contactName, contactEmail: ws.contactEmail, language: ws.language, brief: ws.brief, notes: ws.notes, token: ws.token, status: ws.status, total: ws.credits.total, used: ws.credits.used, expiresAt: ws.expiresAt ? ws.expiresAt.slice(0, 10) : '' });
+  const [f, setF] = useState({ company: ws.company, industry: ws.industry, contactName: ws.contactName, contactEmail: ws.contactEmail, language: ws.language, brief: ws.brief, notes: ws.notes, token: ws.token, status: ws.status, total: ws.credits.total, used: ws.credits.used, budgetUsd: ws.budgetUsd ?? 10, expiresAt: ws.expiresAt ? ws.expiresAt.slice(0, 10) : '' });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
-  const submit = () => onSave({ ...f, credits: { total: f.total, used: f.used }, expiresAt: f.expiresAt ? new Date(f.expiresAt).toISOString() : null });
+  const submit = () => onSave({ ...f, credits: { total: f.total, used: f.used }, budgetUsd: f.budgetUsd, expiresAt: f.expiresAt ? new Date(f.expiresAt).toISOString() : null });
   const del = async () => {
     await adminApi.deleteWorkspace(ws.id);
     location.href = '/admin/workspaces';
@@ -134,6 +148,15 @@ function GeneralTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<
           <Field label="Used" htmlFor="g-cu"><Input id="g-cu" type="number" min={0} value={f.used} onChange={(e) => set('used', Number(e.target.value))} /></Field>
         </div>
         <Field label="Expires (optional)" htmlFor="g-ex"><Input id="g-ex" type="date" value={f.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} /></Field>
+        <div className="sm:col-span-2 rounded-xl bg-sand-2 p-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <Field label={t('ad_ws_budget')} htmlFor="g-bu" help={t('ad_ws_budget_hint')}>
+              <Input id="g-bu" type="number" min={0} step={1} value={f.budgetUsd} onChange={(e) => set('budgetUsd', Number(e.target.value))} className="max-w-[160px]" />
+            </Field>
+            <Button type="button" size="sm" variant="soft" icon="plus" onClick={() => set('budgetUsd', Math.round((f.budgetUsd + 10) * 100) / 100)}>{t('ad_budget_raise')}</Button>
+          </div>
+          <BudgetMeter spent={ws.spentUsd ?? 0} budget={f.budgetUsd} label={t('ad_ws_spent')} />
+        </div>
       </div>
       <Field label={t('ad_ws_brief')} htmlFor="g-b"><Textarea id="g-b" rows={4} value={f.brief} onChange={(e) => set('brief', e.target.value)} /></Field>
       <Field label={t('ad_ws_notes')} htmlFor="g-n"><Textarea id="g-n" rows={3} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>

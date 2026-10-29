@@ -44,10 +44,11 @@ export default function ChatAgent() {
         if (e.type === 'run.started') setCredits(e.creditsRemaining);
         if (e.type === 'step.delta') { acc += e.text; setPending(acc); }
         if (e.type === 'run.done') { setCredits(e.creditsRemaining); setMessages((m) => [...m, { role: 'assistant', content: e.run.output }]); setPending(''); }
-        if (e.type === 'error') setError(e.code === 'no_credits' ? t('run_error_credits') : e.message);
+        if (e.type === 'error') setError(e.code === 'no_credits' ? t('run_error_credits') : e.code === 'no_budget' ? t('run_error_budget') : e.message);
       }, ac.signal);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_credits') setError(t('run_error_credits'));
+      else if (e instanceof ApiError && e.code === 'no_budget') setError(t('run_error_budget'));
       else if (!(e instanceof DOMException && e.name === 'AbortError')) setError(e instanceof Error ? e.message : t('error_generic'));
     } finally {
       setBusy(false);
@@ -55,7 +56,7 @@ export default function ChatAgent() {
   };
 
   const onSubmit = (e: FormEvent) => { e.preventDefault(); void send(draft); };
-  const noCredits = view.creditsRemaining <= 0;
+  const noCredits = view.creditsRemaining <= 0 || view.budgetExhausted;
 
   return (
     <div className="flex h-[calc(100dvh-15.5rem)] min-h-[520px] flex-col gap-3 md:h-[calc(100vh-12rem)]">

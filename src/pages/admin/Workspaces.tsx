@@ -5,6 +5,7 @@ import { Alert, Badge, Button, Field, Input, Modal, SectionHead, Select, Skeleto
 import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { adminApi, type WorkspaceWithStats } from '@/lib/api';
+import { BudgetMeter } from './WorkspaceEditor';
 
 const STATUS_TONE = { draft: 'neutral', active: 'success', converted: 'brand', archived: 'warn' } as const;
 
@@ -16,7 +17,7 @@ export default function Workspaces() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ company: '', industry: '', contactName: '', contactEmail: '', language: 'vi' as Lang, brief: '', credits: 50, workflowIds: ['company-assistant', 'customer-reply', 'weekly-report', 'meeting-actions'] });
+  const [form, setForm] = useState({ company: '', industry: '', contactName: '', contactEmail: '', language: 'vi' as Lang, brief: '', credits: 50, budgetUsd: 10, workflowIds: ['company-assistant', 'customer-reply', 'weekly-report', 'meeting-actions'] });
 
   useEffect(() => {
     adminApi.workspaces().then((r) => setList(r.workspaces)).catch((e) => setError(String(e)));
@@ -50,6 +51,7 @@ export default function Workspaces() {
                 <p className="flex flex-wrap items-center gap-2 font-semibold text-jade-12">{w.company} <span className="font-mono text-[11px] font-medium text-sand-9">/s/{w.token}</span></p>
                 <p className="text-[12.5px] text-sand-9">{w.industry || '—'} · {w.workflowIds.length + w.customWorkflows.length} {t('sb_nav_workflows').toLowerCase()} · <span className="tnum">{w.credits.used}/{w.credits.total}</span> credits · {new Date(w.updatedAt).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}</p>
               </div>
+              <div className="hidden md:block"><BudgetMeter spent={w.spentUsd ?? 0} budget={w.budgetUsd ?? 0} label={t('ad_ws_spent')} compact /></div>
               <span className="hidden text-[12.5px] text-sand-10 tnum sm:block"><Icon name="bolt" size={13} className="mr-1 inline text-jade-9" />{w.stats.runs} · <Icon name="inbox" size={13} className="mx-1 inline text-jade-9" />{w.stats.leads}</span>
               <Badge tone={STATUS_TONE[w.status]} dot>{w.status}</Badge>
               <Icon name="chevronRight" size={16} className="text-sand-7 transition group-hover:translate-x-0.5 group-hover:text-jade-9" />
@@ -67,6 +69,7 @@ export default function Workspaces() {
             <Field label={t('ad_ws_email')} htmlFor="ce"><Input id="ce" type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} /></Field>
             <Field label={t('ad_ws_lang')} htmlFor="l"><Select id="l" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value as Lang })}><option value="vi">{t('lang_vi')}</option><option value="en">{t('lang_en')}</option></Select></Field>
             <Field label={t('ad_ws_credits')} htmlFor="cr"><Input id="cr" type="number" min={1} max={10000} value={form.credits} onChange={(e) => setForm({ ...form, credits: Number(e.target.value) })} /></Field>
+            <Field label={t('ad_ws_budget')} htmlFor="bu" help={t('ad_ws_budget_hint')}><Input id="bu" type="number" min={0} max={1000} value={form.budgetUsd} onChange={(e) => setForm({ ...form, budgetUsd: Number(e.target.value) })} /></Field>
           </div>
           <Field label={t('ad_ws_brief')} htmlFor="b"><Textarea id="b" rows={4} value={form.brief} onChange={(e) => setForm({ ...form, brief: e.target.value })} /></Field>
           <div>

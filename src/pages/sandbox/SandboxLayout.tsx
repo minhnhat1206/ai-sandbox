@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useParams } from 'react-router-dom';
 import type { SandboxView } from '@shared/types';
 import { BRAND_NAME, LangToggle, Logo } from '@/components/Logo';
 import { Ring } from '@/components/illustrations';
-import { Alert, Skeleton } from '@/components/ui';
+import { Alert, Button, Skeleton } from '@/components/ui';
 import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { ApiError, sandboxApi } from '@/lib/api';
@@ -98,7 +98,18 @@ export default function SandboxLayout() {
           </div>
         )}
         <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
-          {view.creditsRemaining <= 0 && <div className="mb-5"><Alert tone="warn">{t('sb_credits_out')}</Alert></div>}
+          {view.budgetExhausted ? (
+            <div className="grain relative mb-6 overflow-hidden rounded-xl2 bg-ink-900 p-5 text-white animate-rise">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-amber-9/30 blur-3xl" />
+              <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-[15px] font-bold"><Icon name="flag" size={16} className="text-amber-6" /> {t('sb_budget_out_title')}</p>
+                  <p className="mt-1 max-w-2xl text-[13.5px] text-white/70">{t('sb_budget_out')}</p>
+                </div>
+                <Link to={`/s/${token}/contact?type=book_call`}><Button icon="calendarCheck" className="shrink-0">{t('run_cta_btn')}</Button></Link>
+              </div>
+            </div>
+          ) : view.creditsRemaining <= 0 ? <div className="mb-5"><Alert tone="warn">{t('sb_credits_out')}</Alert></div> : null}
           <Outlet />
         </main>
         <footer className="border-t border-sand-4 py-5 text-center text-[12px] text-sand-9">

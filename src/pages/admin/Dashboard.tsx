@@ -54,7 +54,7 @@ export default function Dashboard() {
         <Stat label={t('ad_kpi_leads')} value={data.leads} icon="inbox" />
         <Stat label={t('ad_kpi_hours')} value={data.hoursSaved} icon="hours" />
         <Stat label={t('ad_kpi_rating')} value={data.avgRating ?? '—'} icon="star" />
-        <Stat label={t('ad_kpi_cost')} value={`$${data.costUsd.toFixed(2)}`} hint={data.provider.isDemo ? t('demo_mode') : data.provider.model} icon="dollar" />
+        <Stat label={t('ad_kpi_cost')} value={`$${data.costUsd.toFixed(2)}`} hint={`${t('ad_kpi_budget')} $${data.budgetUsd.toFixed(0)} · ${data.provider.isDemo ? t('demo_mode') : data.provider.model}`} icon="dollar" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">

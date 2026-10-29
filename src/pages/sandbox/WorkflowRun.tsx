@@ -77,11 +77,12 @@ export default function WorkflowRun() {
           case 'artifact': setArtifacts((a) => [...a, e.artifact]); break;
           case 'action': setActions((a) => [...a, e.action]); break;
           case 'run.done': setRun(e.run); setCredits(e.creditsRemaining); break;
-          case 'error': setError(e.code === 'no_credits' ? t('run_error_credits') : e.message); break;
+          case 'error': setError(e.code === 'no_credits' ? t('run_error_credits') : e.code === 'no_budget' ? t('run_error_budget') : e.message); break;
         }
       }, ac.signal);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_credits') setError(t('run_error_credits'));
+      else if (e instanceof ApiError && e.code === 'no_budget') setError(t('run_error_budget'));
       else if (!(e instanceof DOMException && e.name === 'AbortError')) setError(e instanceof Error ? e.message : t('error_generic'));
     } finally {
       setRunning(false);
@@ -104,7 +105,7 @@ export default function WorkflowRun() {
     }
   };
 
-  const noCredits = view.creditsRemaining <= 0;
+  const noCredits = view.creditsRemaining <= 0 || view.budgetExhausted;
   const hasOutput = steps.length > 0;
   const duration = run?.finishedAt ? ((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1) : null;
   const runId = run?.id;

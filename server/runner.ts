@@ -53,6 +53,7 @@ function baseRun(req: Omit<RunRequest, 'inputs'> & { inputs: Record<string, stri
     model: provider.model,
     inputTokens: 0,
     outputTokens: 0,
+    cacheReadTokens: 0,
     costUsd: 0,
     minutesSaved: req.workflow.minutesSavedPerRun,
     trace: [],
@@ -104,7 +105,7 @@ async function runStep(
       onText,
       opts.signal,
     );
-    return { id: step.id, title: step.title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - started };
+    return { id: step.id, title: step.title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, cacheReadTokens: result.cacheReadTokens ?? 0, durationMs: Date.now() - started };
   }
 
   // ---- agent step --------------------------------------------------------
@@ -156,7 +157,7 @@ async function runStep(
     },
     opts.signal,
   );
-  return { id: step.id, title: step.title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - started };
+  return { id: step.id, title: step.title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, cacheReadTokens: result.cacheReadTokens ?? 0, durationMs: Date.now() - started };
 }
 
 /**
@@ -184,6 +185,7 @@ export async function runWorkflow(req: RunRequest, provider: Provider, emit: (e:
       ctx.steps[step.id] = stepResult.output;
       run.inputTokens += stepResult.inputTokens;
       run.outputTokens += stepResult.outputTokens;
+      run.cacheReadTokens += stepResult.cacheReadTokens ?? 0;
       await emit({ type: 'step.done', stepId: step.id });
     }
     run.output = run.steps.length ? run.steps[run.steps.length - 1].output : '';
@@ -195,7 +197,7 @@ export async function runWorkflow(req: RunRequest, provider: Provider, emit: (e:
     throw new RunError(run.error, 'provider');
   } finally {
     run.finishedAt = nowIso();
-    run.costUsd = estimateCostUsd(run.model, run.inputTokens, run.outputTokens);
+    run.costUsd = estimateCostUsd(run.model, run.inputTokens, run.outputTokens, run.cacheReadTokens);
   }
   return run;
 }
@@ -234,6 +236,7 @@ export async function runChat(req: ChatRequest, provider: Provider, emit: (e: Ru
     run.output = result.text || buffer;
     run.inputTokens = result.inputTokens;
     run.outputTokens = result.outputTokens;
+    run.cacheReadTokens = result.cacheReadTokens ?? 0;
     run.status = 'done';
     await emit({ type: 'step.done', stepId: 'chat' });
   } catch (err) {
@@ -243,7 +246,7 @@ export async function runChat(req: ChatRequest, provider: Provider, emit: (e: Ru
     throw new RunError(run.error, 'provider');
   } finally {
     run.finishedAt = nowIso();
-    run.costUsd = estimateCostUsd(run.model, run.inputTokens, run.outputTokens);
+    run.costUsd = estimateCostUsd(run.model, run.inputTokens, run.outputTokens, run.cacheReadTokens);
   }
   return run;
 }

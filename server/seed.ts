@@ -55,6 +55,8 @@ export function demoWorkspace(): Workspace {
     dataSources: demoDataSources(ts),
     mcpServers: [],
     credits: { total: 100, used: 0 },
+    budgetUsd: 10,
+    spentUsd: 0,
     status: 'active',
     notes: 'Demo sandbox created automatically. Safe to edit or delete.',
     createdAt: ts,
