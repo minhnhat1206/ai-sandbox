@@ -89,6 +89,7 @@ async function runStep(
   emit: (e: RunEvent) => void | Promise<void>,
   opts: RunOptions,
   attachments: UploadMeta[],
+  history?: ChatMessage[],
 ): Promise<RunStepResult> {
   const started = Date.now();
   let buffer = '';
@@ -123,7 +124,7 @@ async function runStep(
   const result = await provider.runAgent(
     {
       system: renderTemplate(step.system, ctx),
-      messages: [{ role: 'user', content: renderTemplate(step.prompt, ctx) }],
+      messages: history ?? [{ role: 'user', content: renderTemplate(step.prompt, ctx) }],
       maxTokens: step.maxTokens,
       attachments,
       getBytes,
@@ -217,26 +218,37 @@ export async function runChat(req: ChatRequest, provider: Provider, emit: (e: Ru
   const ctx = buildContext(workspace, req.lang, {}, !!workflow.useKnowledge);
   const title = { vi: 'Trả lời', en: 'Reply' };
   await emit({ type: 'step.started', stepId: 'chat', title, index: 0, total: 1 });
-  const started = Date.now();
   try {
-    let buffer = '';
-    const result = await provider.complete(
-      {
-        system: renderTemplate(workflow.chat.system, ctx),
-        messages: messages.slice(-20),
-        meta: { workflowId: workflow.id, stepId: 'chat', lang: req.lang, inputs: { message: lastUser } },
-      },
-      (text) => {
-        buffer += text;
-        void emit({ type: 'step.delta', stepId: 'chat', text });
-      },
-      opts.signal,
-    );
-    run.steps.push({ id: 'chat', title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - started });
-    run.output = result.text || buffer;
-    run.inputTokens = result.inputTokens;
-    run.outputTokens = result.outputTokens;
-    run.cacheReadTokens = result.cacheReadTokens ?? 0;
+    if (workflow.chat.agent) {
+      // Tool-using chat: reuse the agent step machinery with the whole history.
+      const step: WorkflowStep = { id: 'chat', title, system: workflow.chat.system, prompt: '', agent: workflow.chat.agent };
+      const result = await runStep(step, workflow, workspace, run, ctx, provider, emit, opts, [], messages.slice(-20));
+      run.steps.push(result);
+      run.output = result.output;
+      run.inputTokens = result.inputTokens;
+      run.outputTokens = result.outputTokens;
+      run.cacheReadTokens = result.cacheReadTokens ?? 0;
+    } else {
+      const started = Date.now();
+      let buffer = '';
+      const result = await provider.complete(
+        {
+          system: renderTemplate(workflow.chat.system, ctx),
+          messages: messages.slice(-20),
+          meta: { workflowId: workflow.id, stepId: 'chat', lang: req.lang, inputs: { message: lastUser } },
+        },
+        (text) => {
+          buffer += text;
+          void emit({ type: 'step.delta', stepId: 'chat', text });
+        },
+        opts.signal,
+      );
+      run.steps.push({ id: 'chat', title, output: result.text || buffer, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - started });
+      run.output = result.text || buffer;
+      run.inputTokens = result.inputTokens;
+      run.outputTokens = result.outputTokens;
+      run.cacheReadTokens = result.cacheReadTokens ?? 0;
+    }
     run.status = 'done';
     await emit({ type: 'step.done', stepId: 'chat' });
   } catch (err) {

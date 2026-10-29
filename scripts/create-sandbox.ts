@@ -73,7 +73,7 @@ function viaStore(): Workspace {
     contactEmail: String(payload.contactEmail ?? ''),
     language: payload.language === 'en' ? 'en' : 'vi',
     brief: String(payload.brief ?? ''),
-    workflowIds: Array.isArray(payload.workflowIds) ? (payload.workflowIds as string[]) : ['company-assistant', 'customer-reply', 'weekly-report'],
+    workflowIds: Array.isArray(payload.workflowIds) ? (payload.workflowIds as string[]) : ['order-care-agent', 'quote-builder-agent', 'receivables-agent', 'data-chat', 'policy-helpdesk'],
     overrides: (payload.overrides as Workspace['overrides']) ?? {},
     customWorkflows: (payload.customWorkflows as Workspace['customWorkflows']) ?? [],
     dataSources: Array.isArray(payload.dataSources) ? (payload.dataSources as { name: string; description?: string; csv: string }[]).map((d) => ({ id: `ds_${shortId(6)}`, name: d.name, description: d.description ?? '', csv: d.csv, updatedAt: ts })) : [],

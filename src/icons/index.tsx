@@ -97,6 +97,12 @@ export const ICONS: Record<string, Paths> = {
   Building2: <>{duo('M5 4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21H5z')}<path d="M3 21h18" /><path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21" /><path d="M15 9h3.5A1.5 1.5 0 0 1 20 10.5V21" /><path d="M8.5 7h2M8.5 10.5h2M8.5 14h2M8.5 17.5h2M17 13h1M17 16.5h1" /></>,
   LineChart: <>{duo('M7 14l4-4 3 3 5-6v12H7z')}<path d="M4 4v16h16" /><path d="M7 14l4-4 3 3 5-6" /><circle cx="19" cy="7" r="1.5" fill="currentColor" stroke="none" /></>,
   Search: <>{duo('M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z')}<circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>,
+  Landmark: <>{duo('M3 9.5L12 4l9 5.5z')}<path d="M3 9.5L12 4l9 5.5z" strokeLinejoin="round" /><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7" /><path d="M3.5 20h17M4.5 17.5h15" /></>,
+  Presentation: <>{duo('M4 4h16v11H4z')}<path d="M3 4h18" /><rect x="4" y="4" width="16" height="11" rx="1.5" /><path d="M12 15v3M8.5 21l3.5-3 3.5 3" /><path d="M8 11.5V10M11 11.5V8M14 11.5V9.5M17 11.5V7.5" /></>,
+  Inbox: <>{duo('M4 13h4.5l1.2 2.5h4.6L15.5 13H20v5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z')}<path d="M4 13l2.2-7.4A1.5 1.5 0 0 1 7.6 4.5h8.8a1.5 1.5 0 0 1 1.4 1.1L20 13v5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z" /><path d="M4 13h4.5l1.2 2.5h4.6L15.5 13H20" /><path d="M9 8h6M10 10.5h4" /></>,
+  Radar: <>{duo('M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z')}<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" /><path d="M12 12l6-6" /><circle cx="15.5" cy="9" r="1" fill="currentColor" stroke="none" /></>,
+  Wallet: <>{duo('M4 7h15a1 1 0 0 1 1 1v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z')}<path d="M4 7h15a1 1 0 0 1 1 1v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18V6a1.5 1.5 0 0 1 1.5-1.5H17v2.5" strokeLinejoin="round" /><path d="M20 11h-4a2 2 0 0 0 0 4h4" /><circle cx="16.2" cy="13" r=".9" fill="currentColor" stroke="none" /></>,
+  Funnel: <>{duo('M3.5 5h17l-6.5 8v6l-4 1.5V13z')}<path d="M3.5 5h17l-6.5 8v6l-4 1.5V13z" strokeLinejoin="round" /><path d="M7 9h10" /></>,
   Tags: <>{duo('M3 12V4h8l9 9-8 8z')}<path d="M3 12V4h8l9 9-8 8z" strokeLinejoin="round" /><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" /><path d="M14 4l8 8" /></>,
 };
 

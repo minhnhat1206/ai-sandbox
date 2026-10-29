@@ -327,7 +327,7 @@ export function createApp(deps: AppDeps): Hono {
       contactEmail: str(body.contactEmail, 200),
       language: asLang(body.language, 'vi'),
       brief: str(body.brief, 4000),
-      workflowIds: Array.isArray(body.workflowIds) ? (body.workflowIds as unknown[]).filter((id): id is string => typeof id === 'string' && !!CATALOG.find((w) => w.id === id)) : ['company-assistant', 'customer-reply', 'weekly-report'],
+      workflowIds: Array.isArray(body.workflowIds) ? (body.workflowIds as unknown[]).filter((id): id is string => typeof id === 'string' && !!CATALOG.find((w) => w.id === id)) : ['order-care-agent', 'quote-builder-agent', 'receivables-agent', 'data-chat', 'policy-helpdesk'],
       overrides: {},
       customWorkflows: [],
       knowledge: [],
@@ -441,7 +441,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!brief) return c.json({ error: 'brief is required' }, 400);
     const lang = asLang(body.lang, 'vi');
     const system = `You design AI workflow definitions for a no-account trial platform. Return ONLY a JSON object (no prose, no code fences) matching this TypeScript type:
-WorkflowDef { id: kebab-case string starting with "custom-"; version: 1; kind: "form"; category: "operations"|"sales"|"marketing"|"finance"|"hr"|"customer-service"|"general"; icon: one of ${WORKFLOW_ICONS.join('|')}; name/tagline/description: {vi, en}; tags: string[]; minutesSavedPerRun: number; useKnowledge: boolean; inputs: {key, label:{vi,en}, type:"text"|"textarea"|"select"|"number", required?, rows?, sample: string, options?: {value,label:{vi,en}}[]}[]; steps: {id, title:{vi,en}, system, prompt, agent?: {tools: ("query_records"|"aggregate_records"|"search_knowledge"|"create_ticket"|"draft_email"|"calculate"|"create_artifact"|"web_search")[], maxTurns?: number}}[] }
+WorkflowDef { id: kebab-case string starting with "custom-"; version: 1; kind: "form"; category: "operations"|"sales"|"marketing"|"finance"|"hr"|"customer-service"|"management"|"general"; icon: one of ${WORKFLOW_ICONS.join('|')}; name/tagline/description: {vi, en}; tags: string[]; minutesSavedPerRun: number; useKnowledge: boolean; inputs: {key, label:{vi,en}, type:"text"|"textarea"|"select"|"number", required?, rows?, sample: string, options?: {value,label:{vi,en}}[]}[]; steps: {id, title:{vi,en}, system, prompt, agent?: {tools: ("query_records"|"aggregate_records"|"search_knowledge"|"create_ticket"|"draft_email"|"calculate"|"create_artifact"|"web_search")[], maxTurns?: number}}[] }
 Rules: 1-3 inputs with realistic Vietnamese sample values; 1-2 steps; when the task needs company data, actions or deliverables, make the step an agent (tools: query_records/aggregate_records for connected tables, search_knowledge for documents, create_ticket/draft_email for actions, create_artifact for dashboards/tables, calculate for math) and include "{{sources}}" in its system prompt; prompts use {{input.key}}, later steps may use {{steps.id}}; include "{{company}}" and "Write in {{language}}" in system prompts; if useKnowledge is true include "{{knowledge}}" in a system prompt. The prospect's primary language is ${lang === 'vi' ? 'Vietnamese' : 'English'}.`;
     try {
       const raw = await provider.completeText(system, `Prospect brief:\n${brief}`);

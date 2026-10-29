@@ -54,7 +54,7 @@ describe('public sandbox API', () => {
     const res = await app.request('/api/sandbox/demo/runs', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workflowId: 'invoice-extract', lang: 'vi', sessionId: 's1', visitorName: 'Tester', inputs: { document: 'CTY A\nSố: 12 Ngày 01/01/2026\n1. Thùng - 2 cái x 10.000 = 20.000\nCộng tiền hàng: 20.000\nThuế GTGT 8%: 1.600\nTổng thanh toán: 21.600' } }),
+      body: JSON.stringify({ workflowId: 'inventory-agent', lang: 'vi', sessionId: 's1', visitorName: 'Tester', inputs: { safety: '7', budget: '300000000' } }),
     });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/event-stream');
@@ -65,8 +65,8 @@ describe('public sandbox API', () => {
     expect(types[types.length - 1]).toBe('run.done');
     const done = events[events.length - 1] as Extract<RunEvent, { type: 'run.done' }>;
     expect(done.run.status).toBe('done');
-    expect(done.run.output).toContain('21.600');
-    expect(done.run.output).toContain('✅');
+    expect(done.run.output).toContain('Gạo ST25');
+    expect(done.run.artifacts.length).toBeGreaterThan(0);
     expect(done.creditsRemaining).toBe(99);
     expect(store.listRuns({ sessionId: 's1' })).toHaveLength(1);
   });
@@ -75,7 +75,7 @@ describe('public sandbox API', () => {
     const res = await app.request('/api/sandbox/demo/runs', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workflowId: 'customer-reply', inputs: { message: '' } }),
+      body: JSON.stringify({ workflowId: 'order-care-agent', inputs: { message: '' } }),
     });
     const events = await readSse(res);
     expect(events[0].type).toBe('error');
@@ -87,7 +87,7 @@ describe('public sandbox API', () => {
       app.request('/api/sandbox/demo/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workflowId: 'policy-assistant', lang: 'vi', sessionId: 's2', messages: [{ role: 'user', content: 'Tôi được nghỉ phép bao nhiêu ngày?' }] }),
+        body: JSON.stringify({ workflowId: 'policy-helpdesk', lang: 'vi', sessionId: 's2', messages: [{ role: 'user', content: 'Tôi được nghỉ phép bao nhiêu ngày?' }] }),
       });
     const events = await readSse(await chat());
     const done = events.find((e) => e.type === 'run.done') as Extract<RunEvent, { type: 'run.done' }>;
@@ -99,7 +99,7 @@ describe('public sandbox API', () => {
   });
 
   it('accepts feedback and leads', async () => {
-    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'weekly-report', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0, minutesSaved: 10, trace: [], artifacts: [], actions: [], startedAt: '' };
+    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'order-care-agent', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0, minutesSaved: 10, trace: [], artifacts: [], actions: [], startedAt: '' };
     store.upsertRun(run);
     const fb = await app.request('/api/sandbox/demo/runs/run_x/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating: 5, feedback: 'great' }) });
     expect(fb.status).toBe(200);
@@ -123,11 +123,11 @@ describe('admin API', () => {
   });
 
   it('creates, updates and deletes a workspace with a unique token', async () => {
-    const created = await app.request('/api/admin/workspaces', { method: 'POST', headers: auth, body: JSON.stringify({ company: 'Công ty Thử Nghiệm', industry: 'Retail', credits: 20, workflowIds: ['weekly-report', 'bogus'] }) });
+    const created = await app.request('/api/admin/workspaces', { method: 'POST', headers: auth, body: JSON.stringify({ company: 'Công ty Thử Nghiệm', industry: 'Retail', credits: 20, workflowIds: ['quote-builder-agent', 'bogus'] }) });
     expect(created.status).toBe(201);
     const ws = (await json(created)).workspace as Workspace;
     expect(ws.token).toBe('cong-ty-thu-nghiem');
-    expect(ws.workflowIds).toEqual(['weekly-report']);
+    expect(ws.workflowIds).toEqual(['quote-builder-agent']);
     expect(ws.credits.total).toBe(20);
 
     const dup = await app.request('/api/admin/workspaces', { method: 'POST', headers: auth, body: JSON.stringify({ company: 'Công ty Thử Nghiệm' }) });
@@ -135,7 +135,7 @@ describe('admin API', () => {
 
     const updated = await app.request(`/api/admin/workspaces/${ws.id}`, {
       method: 'PUT', headers: auth,
-      body: JSON.stringify({ knowledge: [{ title: 'Doc', content: 'Hello' }], customWorkflows: [], credits: { total: 30 }, status: 'active', overrides: { 'weekly-report': { samples: { notes: 'X' } } } }),
+      body: JSON.stringify({ knowledge: [{ title: 'Doc', content: 'Hello' }], customWorkflows: [], credits: { total: 30 }, status: 'active', overrides: { 'quote-builder-agent': { samples: { request: 'X' } } } }),
     });
     expect(updated.status).toBe(200);
     const body = await json(updated);

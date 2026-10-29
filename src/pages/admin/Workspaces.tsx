@@ -17,7 +17,7 @@ export default function Workspaces() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ company: '', industry: '', contactName: '', contactEmail: '', language: 'vi' as Lang, brief: '', credits: 50, budgetUsd: 10, workflowIds: ['company-assistant', 'customer-reply', 'weekly-report', 'meeting-actions'] });
+  const [form, setForm] = useState({ company: '', industry: '', contactName: '', contactEmail: '', language: 'vi' as Lang, brief: '', credits: 50, budgetUsd: 10, workflowIds: ['order-care-agent', 'quote-builder-agent', 'receivables-agent', 'data-chat', 'policy-helpdesk'] });
 
   useEffect(() => {
     adminApi.workspaces().then((r) => setList(r.workspaces)).catch((e) => setError(String(e)));

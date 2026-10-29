@@ -25,6 +25,11 @@ artifacts) against the sample data; only the narration is scripted, and it is la
 
 ## What prospects can try
 
+21 agents across sales, finance, operations, HR, customer service and management (quote
+builder, bank reconciliation, inbox triage, pipeline review, expense audit, AI readiness
+assessment, AI policy drafting, monthly deck…). Research and selection criteria:
+`docs/USE-CASES.md`.
+
 - **Agents** that look up their data (CSV tables we connect, or real MCP servers with
   Claude), check company documents, open tickets, draft emails and publish deliverables:
   HTML dashboards, tables, CSV, markdown, and real `.xlsx` files through Agent Skills.

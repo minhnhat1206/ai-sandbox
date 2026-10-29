@@ -86,33 +86,10 @@ Quy tắc an toàn: tool chỉ chạy server-side với input được kiểm tr
 - Founder thấy thanh ngân sách ở danh sách sandbox và tab Thông tin; nút *Nâng trần +10 USD* mở lại sandbox khi khách đồng ý đi tiếp (Kickstart / Assessment).
 - Chế độ demo (mock) miễn phí nên không bao giờ chạm trần.
 
-## 5. Thư viện quy trình (19)
-### Agent (8, xếp đầu gallery)
-| id | Phòng ban | Tool | Sản phẩm |
-|---|---|---|---|
-| order-care-agent | CSKH | orders, customers, receivables, tài liệu, ticket, email | Case file |
-| receivables-agent | Tài chính | receivables (tổng hợp theo tuổi nợ), email | Dashboard HTML, Call list, 3–5 email nhắc |
-| weekly-ops-agent | Vận hành | orders, tickets, email | Dashboard HTML, báo cáo, email gửi GĐ |
-| inventory-agent | Vận hành | inventory | Bảng đặt hàng + CSV |
-| meeting-prep-agent | Kinh doanh | customers, orders, receivables, tickets, web, tài liệu | Brief HTML, talking points |
-| document-review | Chung | file PDF/ảnh/txt, tài liệu | Bảng điều khoản, câu hỏi cho luật sư |
-| data-cleanup | Vận hành | file CSV | Bảng sạch, CSV, nhật ký thay đổi |
-| excel-builder | Tài chính | nguồn dữ liệu + skill xlsx | File .xlsx (thật) / bảng + CSV (demo) |
-
-### Đơn bước (11)
-| id | Phòng ban | Vì sao có trong demo |
-|---|---|---|
-| company-assistant (chat) | Chung | Điểm vào dễ nhất cho người mới |
-| customer-reply | CSKH | Nỗi đau phổ biến nhất ở khách FDI/phân phối |
-| weekly-report | Vận hành | Quản lý mất nửa ngày mỗi tuần |
-| meeting-actions | Vận hành | 2 bước: tóm tắt → email, cho thấy "quy trình" nhiều bước |
-| policy-assistant (chat) | Nhân sự | Chứng minh "AI đọc tài liệu của bạn, không bịa" |
-| sales-outreach | Kinh doanh | Doanh thu nhìn thấy ngay |
-| invoice-extract | Tài chính | Trích xuất + kiểm tra tổng; mock tính thật |
-| data-insight | Tài chính | Dán bảng Excel → nhận xét; mock tính thật |
-| job-description | Nhân sự | 2 bước: JD → bộ câu hỏi phỏng vấn |
-| social-post | Marketing | Song ngữ, 3 biến thể |
-| translate-business | Chung | Lợi thế song ngữ của đội |
+## 5. Thư viện use case (21 agent)
+Toàn bộ 11 use case "một prompt" ban đầu đã bị loại vì khách tự làm được bằng chatbot miễn phí.
+Danh mục hiện tại chỉ gồm agent: đọc dữ liệu thật, thực hiện hành động và bàn giao sản phẩm.
+Nghiên cứu, tiêu chí chọn và bảng đầy đủ: **`docs/USE-CASES.md`**.
 
 ## 6. Vận hành với Claude Code (.claude/)
 - **Rules** (tự nạp): kiến trúc, i18n, cách viết workflow, bảo mật/riêng tư, UX cho người mới, kiểm thử.

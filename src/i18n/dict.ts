@@ -75,7 +75,7 @@ export const DICT = {
   cap_artifacts: { vi: 'Xuất dashboard & file', en: 'Builds dashboards & files' },
   cap_web: { vi: 'Tìm web', en: 'Web search' },
   cap_file: { vi: 'Nhận PDF / ảnh / CSV', en: 'Accepts PDF / image / CSV' },
-  cap_skill: { vi: 'Tạo file Excel/Word thật', en: 'Produces real Excel/Word files' },
+  cap_skill: { vi: 'Xuất file Office thật', en: 'Produces real Office files' },
   cap_mcp: { vi: 'Kết nối MCP', en: 'MCP connectors' },
   run_timeline: { vi: 'Agent đang làm gì', en: 'What the agent is doing' },
   run_timeline_done: { vi: 'Agent đã làm gì', en: 'What the agent did' },
@@ -138,6 +138,8 @@ export const DICT = {
   chat_starters: { vi: 'Thử hỏi:', en: 'Try asking:' },
   chat_reset: { vi: 'Cuộc trò chuyện mới', en: 'New conversation' },
   chat_hint: { vi: 'Mỗi tin nhắn dùng 1 lượt chạy.', en: 'Each message uses 1 run.' },
+  chat_tools_used: { vi: 'Đã dùng {n} công cụ', en: 'Used {n} tools' },
+  chat_working: { vi: 'Agent đang tra cứu…', en: 'The agent is looking things up…' },
 
   // results
   res_title: { vi: 'Kết quả của tôi', en: 'My results' },

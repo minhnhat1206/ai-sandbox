@@ -6,7 +6,7 @@ import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult, Pro
 import { Store } from '../server/store.ts';
 import { UploadStore } from '../server/uploads.ts';
 import { estimateCostUsd, typicalRunCostUsd } from '../shared/engine/pricing.ts';
-import type { RunEvent } from '../shared/types.ts';
+import type { RunEvent, WorkflowDef } from '../shared/types.ts';
 
 /** A "real" provider for billing tests: not demo, reports Opus-like token usage with cache reads. */
 class PaidProvider implements Provider {
@@ -45,8 +45,17 @@ async function readSse(res: Response): Promise<RunEvent[]> {
   return text.split('\n\n').map((chunk) => chunk.split('\n').find((l) => l.startsWith('data:'))).filter((l): l is string => !!l).map((l) => JSON.parse(l.slice(5).trim()) as RunEvent);
 }
 
-const runOnce = (app: ReturnType<typeof makeApp>['app'], workflowId = 'customer-reply') =>
-  app.request('/api/sandbox/demo/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workflowId, lang: 'vi', sessionId: 'b', inputs: { message: 'Đơn trễ', context: '', tone: 'warm' } }) });
+const SIMPLE: WorkflowDef = { id: 'custom-simple', version: 1, kind: 'form', category: 'general', icon: 'Sparkles', name: { vi: 'Đơn giản', en: 'Simple' }, tagline: { vi: 'a', en: 'a' }, description: { vi: 'a', en: 'a' }, tags: [], minutesSavedPerRun: 5, inputs: [{ key: 'message', label: { vi: 'Nội dung', en: 'Content' }, type: 'textarea', sample: 'x' }], steps: [{ id: 'main', title: { vi: 'a', en: 'a' }, system: 's', prompt: '{{input.message}}' }] };
+
+/** Adds a non-agent custom workflow so the cheap-run path can be exercised. */
+function withSimple(store: Store) {
+  const ws = store.getWorkspaceByToken('demo')!;
+  ws.customWorkflows = [SIMPLE];
+  store.upsertWorkspace(ws);
+}
+
+const runOnce = (app: ReturnType<typeof makeApp>['app'], workflowId = 'order-care-agent') =>
+  app.request('/api/sandbox/demo/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workflowId, lang: 'vi', sessionId: 'b', inputs: { message: 'Đơn 48213 trễ', channel: 'zalo' } }) });
 
 describe('pricing', () => {
   it('bills cache reads at the cache rate', () => {
@@ -86,10 +95,11 @@ describe('per-sandbox USD budget', () => {
 
   it('stops slightly early when the next run would clearly cross the cap', async () => {
     const { app, store } = makeApp({ text: '', inputTokens: 1_000, outputTokens: 1_000, cacheReadTokens: 0 });
+    withSimple(store);
     const ws = store.getWorkspaceByToken('demo')!;
     ws.spentUsd = 9.9;
     store.upsertWorkspace(ws);
-    expect((await runOnce(app, 'customer-reply')).status).toBe(200); // cheap run, half a typical simple run fits
+    expect((await runOnce(app, 'custom-simple')).status).toBe(200); // cheap run, half a typical simple run fits
     ws.spentUsd = 9.95;
     store.upsertWorkspace(ws);
     expect((await runOnce(app, 'order-care-agent')).status).toBe(402); // half a typical agent run does not

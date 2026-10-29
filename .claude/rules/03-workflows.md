@@ -2,6 +2,11 @@
 
 A workflow is data (`WorkflowDef` in `shared/types.ts`), never custom React code.
 
+**Every catalog workflow is an agent** (`tests/engine.test.ts` enforces it). Before adding
+one, check it meets the five criteria in `docs/USE-CASES.md` (real data, an action, a
+deliverable, measurable time saved, a role track or our own offer). Single-prompt helpers
+that a free chatbot can do do not belong in the catalog.
+
 - Catalog templates live in `shared/catalog/*.ts`, registered in `shared/catalog/index.ts`.
   Prospect-specific ones are stored on the workspace (`customWorkflows`) via the admin UI
   or the `/new-sandbox` skill.
@@ -29,9 +34,12 @@ A workflow is data (`WorkflowDef` in `shared/types.ts`), never custom React code
 - Actions (`create_ticket`, `draft_email`) are simulated: they land in the run's outbox. Never
   describe them to prospects as "sent".
 - `web_search` and `skills` cannot be combined in one step (both need code execution).
-- Every agent workflow needs a scripted mock in `server/providers/mock-agents.ts` that runs
+- Chat workflows can be agents too: `chat.agent: { tools }` (see `data-chat`, `policy-helpdesk`).
+- Every agent workflow needs a scripted mock in `server/providers/mock-agents.ts` (or
+  `mock-agents-extra.ts`, helpers in `mock-kit.ts`) that runs
   the real tools on the demo data (`server/seed-data.ts`), so offline demos show real numbers.
-  Add a test in `tests/agents.test.ts` asserting the trace, artifacts and actions.
+  `tests/usecases.test.ts` runs every catalog workflow on the samples; add a figure-level
+  assertion there for the numbers the demo relies on.
 - File inputs (`type: 'file'`) must be optional and paired with a textarea sample.
 - New data for the demo sandbox goes in `server/seed-data.ts` as CSV with lower-case
   identifier column names; keep figures consistent across tables (ids, names, amounts).

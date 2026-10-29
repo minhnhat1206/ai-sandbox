@@ -15,6 +15,7 @@ const CATEGORY_LABEL: Record<WorkflowCategory, { vi: string; en: string; icon: s
   finance: { vi: 'Tài chính', en: 'Finance', icon: 'Receipt' },
   hr: { vi: 'Nhân sự', en: 'HR', icon: 'Users' },
   'customer-service': { vi: 'CSKH', en: 'Customer service', icon: 'Headset' },
+  management: { vi: 'Quản trị', en: 'Management', icon: 'Building2' },
   general: { vi: 'Chung', en: 'General', icon: 'Sparkles' },
 };
 

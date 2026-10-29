@@ -22,18 +22,26 @@ describe('renderTemplate', () => {
 });
 
 describe('validateInputs', () => {
-  const fields = CATALOG.find((w) => w.id === 'weekly-report')!.inputs;
+  const fields = CATALOG.find((w) => w.id === 'order-care-agent')!.inputs;
   it('requires required fields and validates selects', () => {
-    expect(validateInputs(fields, { notes: '', audience: 'ceo' })).toHaveLength(1);
-    expect(validateInputs(fields, { notes: 'x', audience: 'bogus' })[0].key).toBe('audience');
-    expect(validateInputs(fields, { notes: 'x', audience: 'ceo' })).toEqual([]);
+    expect(validateInputs(fields, { message: '', channel: 'zalo' })).toHaveLength(1);
+    expect(validateInputs(fields, { message: 'x', channel: 'bogus' })[0].key).toBe('channel');
+    expect(validateInputs(fields, { message: 'x', channel: 'zalo' })).toEqual([]);
   });
-  it('rejects oversized input', () => {
-    expect(validateInputs(fields, { notes: 'a'.repeat(20001), audience: 'ceo' })[0].message.en).toMatch(/too long/);
+  it('rejects oversized input and unknown upload ids', () => {
+    expect(validateInputs(fields, { message: 'a'.repeat(20001), channel: 'zalo' })[0].message.en).toMatch(/too long/);
+    const fileFields = CATALOG.find((w) => w.id === 'document-review')!.inputs;
+    expect(validateInputs(fileFields, { file: 'nope', side: 'B' })[0].key).toBe('file');
   });
 });
 
 describe('catalog', () => {
+  it('contains only agents (no single-prompt workflows)', () => {
+    for (const wf of CATALOG) {
+      const agentic = wf.kind === 'chat' ? !!wf.chat?.agent : wf.steps.every((s) => !!s.agent);
+      expect(agentic, wf.id).toBe(true);
+    }
+  });
   it('is structurally valid and every form workflow has samples that pass validation', () => {
     expect(validateCatalog(CATALOG)).toEqual([]);
     for (const wf of CATALOG.filter((w) => w.kind === 'form')) {
@@ -51,12 +59,13 @@ describe('catalog', () => {
 
 describe('applyOverride', () => {
   it('replaces prompts and samples without mutating the catalog', () => {
-    const wf = CATALOG.find((w) => w.id === 'weekly-report')!;
-    const out = applyOverride(wf, { steps: { report: { prompt: 'NEW' } }, samples: { notes: 'S' } });
+    const wf = CATALOG.find((w) => w.id === 'order-care-agent')!;
+    const out = applyOverride(wf, { steps: { resolve: { prompt: 'NEW' } }, samples: { message: 'S' } });
     expect(out.steps[0].prompt).toBe('NEW');
+    expect(out.steps[0].agent?.tools).toContain('create_ticket');
     expect(out.inputs[0].sample).toBe('S');
     expect(wf.steps[0].prompt).not.toBe('NEW');
-    expect(sampleInputs(wf, { samples: { notes: 'S' } }).notes).toBe('S');
+    expect(sampleInputs(wf, { samples: { message: 'S' } }).message).toBe('S');
   });
 });
 

@@ -88,6 +88,12 @@ function pretty(s?: string): string {
   try { return JSON.stringify(JSON.parse(s), null, 2).slice(0, 4000); } catch { return s.slice(0, 4000); }
 }
 
+/** Thousands separators for numbers (vi-VN), raw text otherwise. */
+function formatCell(v: unknown): string {
+  if (typeof v === 'number') return Number.isInteger(v) ? new Intl.NumberFormat('vi-VN').format(v) : String(v);
+  return String(v ?? '');
+}
+
 const KIND_ICON: Record<Artifact['kind'], string> = { html: 'LineChart', table: 'Table', markdown: 'FileText', csv: 'Table', json: 'Calculator', file: 'paperclip' };
 
 export function ArtifactsPanel({ artifacts, urlFor }: { artifacts: Artifact[]; urlFor: (a: Artifact, download?: boolean) => string }) {
@@ -115,7 +121,7 @@ export function ArtifactsPanel({ artifacts, urlFor }: { artifacts: Artifact[]; u
           <div className="max-h-[480px] overflow-auto rounded-xl hairline">
             <table className="w-full text-[12.5px]">
               <thead className="sticky top-0 bg-sand-3"><tr>{current.columns.map((c) => <th key={c} className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-sand-11">{c}</th>)}</tr></thead>
-              <tbody>{(current.rows ?? []).map((r, i) => <tr key={i} className="border-t border-sand-4 odd:bg-white even:bg-sand-1">{current.columns!.map((c) => <td key={c} className="px-3 py-1.5 align-top tnum">{String(r[c] ?? '')}</td>)}</tr>)}</tbody>
+              <tbody>{(current.rows ?? []).map((r, i) => <tr key={i} className="border-t border-sand-4 odd:bg-white even:bg-sand-1">{current.columns!.map((c) => <td key={c} className={`px-3 py-1.5 align-top tnum ${typeof r[c] === 'number' ? 'text-right' : ''}`}>{formatCell(r[c])}</td>)}</tr>)}</tbody>
             </table>
           </div>
         )}
@@ -177,9 +183,9 @@ export function ActionsPanel({ actions }: { actions: Action[] }) {
 }
 
 /** Capability badges shown on gallery cards and run headers. */
-export function capabilitiesOf(wf: { steps: { agent?: { tools: string[]; skills?: string[] } }[]; inputs: { type: string }[] }, connectors = 0): string[] {
+export function capabilitiesOf(wf: { steps: { agent?: { tools: string[]; skills?: string[] } }[]; inputs: { type: string }[]; chat?: { agent?: { tools: string[]; skills?: string[] } } }, connectors = 0): string[] {
   const caps = new Set<string>();
-  for (const s of wf.steps) {
+  for (const s of [...wf.steps, ...(wf.chat ? [wf.chat] : [])]) {
     if (!s.agent) continue;
     caps.add('cap_agent');
     if (s.agent.tools.some((t) => t === 'query_records' || t === 'aggregate_records')) caps.add('cap_data');

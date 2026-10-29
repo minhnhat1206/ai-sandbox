@@ -58,20 +58,18 @@ try {
     await dialog.getByRole('button', { name: /Bắt đầu|Get started/ }).click();
   }
   const cards = page.locator('article');
-  check((await cards.count()) >= 6, `gallery shows ${await cards.count()} workflow cards`);
+  check((await cards.count()) >= 20, `gallery shows ${await cards.count()} workflow cards`);
   await page.screenshot({ path: path.join(shots, '02-gallery.png'), fullPage: true });
 
-  // form workflow with sample data
-  await page.goto(`${base}/s/demo/run/invoice-extract`);
+  // quote builder: HTML quotation in a sandboxed iframe + stock-shortfall ticket
+  await page.goto(`${base}/s/demo/run/quote-builder-agent`);
   await page.getByRole('button', { name: /Dùng dữ liệu mẫu|Use sample data/ }).click();
   await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
-  await page.waitForSelector('text=/Kết quả demo|Demo output/', { timeout: 30000 });
-  check(await page.locator('table').first().isVisible(), 'invoice extraction renders a table');
-  check((await page.locator('text=✅').count()) >= 1, 'invoice totals verified');
-  await page.getByRole('radio', { name: '5' }).click();
-  await page.waitForTimeout(300);
-  check(await page.locator('text=/Đặt lịch trao đổi|Book a call/').first().isVisible(), 'conversion CTA visible after run');
-  await page.screenshot({ path: path.join(shots, '03-run-result.png'), fullPage: true });
+  await page.waitForSelector('text=/Kết quả demo|Demo result/', { timeout: 60000 });
+  await page.frameLocator('iframe[title="Quotation"]').locator('text=BÁO GIÁ').first().waitFor({ timeout: 10000 });
+  check(true, 'quote builder renders a printable quotation');
+  check((await page.locator('text=/Thiếu hàng cho báo giá/').count()) >= 1, 'stock-shortfall ticket created');
+  await page.screenshot({ path: path.join(shots, '03a-quote.png'), fullPage: true });
 
   // agent workflow: tool timeline, deliverables, actions
   await page.goto(`${base}/s/demo/run/order-care-agent`);
@@ -84,6 +82,7 @@ try {
   check(await page.locator('text=/Sản phẩm bàn giao|Deliverables/').first().isVisible(), 'deliverables panel visible');
   check(await page.locator('text=/Hành động đã thực hiện|Actions taken/').first().isVisible(), 'actions panel visible');
   check((await page.locator('text=/^TK-[A-Z0-9]+$/').count()) >= 1, 'ticket id shown');
+  check(await page.locator('text=/Đặt lịch trao đổi|Book a call/').first().isVisible(), 'conversion CTA visible after run');
   await page.screenshot({ path: path.join(shots, '03b-agent-run.png'), fullPage: true });
 
   // agent with HTML dashboard artifact rendered in an iframe
@@ -108,28 +107,36 @@ try {
   check(await page.getByRole('tab', { name: /Clause review/ }).isVisible(), 'uploaded file reviewed into a clause table');
 
   // validation error path
-  await page.goto(`${base}/s/demo/run/customer-reply`);
+  await page.goto(`${base}/s/demo/run/order-care-agent`);
   await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
   check(await page.getByRole('alert').first().isVisible(), 'validation error shown for empty required field');
 
-  // chat agent with knowledge
-  await page.goto(`${base}/s/demo/chat/policy-assistant`);
+  // chat agent with tools: HR helpdesk quotes the policy
+  await page.goto(`${base}/s/demo/chat/policy-helpdesk`);
   await page.getByRole('button', { name: /nghỉ phép|annual leave/ }).first().click();
   await page.waitForSelector('text=/12 ngày|12 annual/', { timeout: 30000 });
-  await page.waitForSelector('textarea:not([disabled])', { timeout: 30000 }); // stream finished
-  check(true, 'policy chat answered from knowledge');
+  await page.waitForSelector('textarea:not([disabled])', { timeout: 30000 });
+  check(await page.locator('text=/Đã dùng \\d+ công cụ|Used \\d+ tools/').first().isVisible(), 'chat shows the tools the agent used');
   await page.screenshot({ path: path.join(shots, '04-chat.png') });
+
+  // data chat returns a table artifact inside the conversation
+  await page.goto(`${base}/s/demo/chat/data-chat`);
+  await page.getByRole('button', { name: /nợ quá hạn|overdue debt/ }).first().click();
+  await page.waitForSelector('text=/Overdue by customer/', { timeout: 30000 });
+  await page.waitForSelector('textarea:not([disabled])', { timeout: 30000 });
+  check((await page.locator('table').last().locator('tr').count()) > 3, 'data chat renders a table artifact');
+  await page.screenshot({ path: path.join(shots, '04b-data-chat.png'), fullPage: true });
 
   // results page
   await page.goto(`${base}/s/demo/results`);
   await page.waitForSelector('text=/Kết quả của tôi|My results/');
   await page.waitForTimeout(500);
   const runRows = await page.locator('button:has-text("Xem"), button:has-text("View")').count();
-  check(runRows >= 5, `results page lists ${runRows} runs`);
+  check(runRows >= 6, `results page lists ${runRows} runs`);
   await page.screenshot({ path: path.join(shots, '05-results.png') });
 
   // lead form
-  await page.goto(`${base}/s/demo/contact?type=book_call&wf=invoice-extract`);
+  await page.goto(`${base}/s/demo/contact?type=book_call&wf=quote-builder-agent`);
   await page.locator('#ct-email').fill('smoke@example.com');
   await page.locator('#ct-msg').fill('Please call me');
   await page.getByRole('button', { name: /^(Gửi|Send)$/ }).click();

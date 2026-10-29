@@ -1,7 +1,7 @@
 /**
  * Realistic sample data for the demo sandbox. Agents query these tables through
  * the connector tools, so numbers in demos are real computations, not prose.
- * All names and figures are fictional.
+ * All names and figures are fictional. "Today" in the sample data is 28/10/2026.
  */
 import type { DataSource } from '../shared/types.ts';
 
@@ -87,6 +87,109 @@ T-1032,2026-10-06,Tạp hoá Cô Ba,Điện thoại,Công nợ,normal,open,Xin g
 T-1031,2026-10-03,Nhà hàng Sen Vàng,Zalo,Giao hàng trễ,normal,resolved,Đơn 48203 trễ 2 ngày,20
 T-1030,2026-10-02,Đại lý Thành Công,Email,Chất lượng,high,resolved,Dầu ăn rò rỉ 15 chai,36`;
 
+
+const aiSurvey = `employee_id,department,role,uses_ai,main_tool,account_type,frequency,data_shared,repetitive_hours_week,trained,top_task
+S01,Kinh doanh,Trưởng phòng,yes,ChatGPT,personal,daily,customer_data,6,no,Soạn email báo giá
+S02,Kinh doanh,Nhân viên,yes,ChatGPT,personal,daily,customer_data,8,no,Viết tin nhắn Zalo cho khách
+S03,Kinh doanh,Nhân viên,yes,Gemini,personal,weekly,none,5,no,Tìm thông tin khách hàng
+S04,Kinh doanh,Nhân viên,no,none,none,never,none,7,no,Nhập đơn hàng
+S05,Kế toán,Kế toán trưởng,yes,ChatGPT,personal,weekly,financial,10,no,Đối soát công nợ
+S06,Kế toán,Nhân viên,yes,ChatGPT,personal,daily,financial,12,no,Nhập hoá đơn
+S07,Kế toán,Nhân viên,no,none,none,never,none,9,no,Đối chiếu sao kê
+S08,CSKH,Trưởng nhóm,yes,ChatGPT,company,daily,customer_data,6,yes,Trả lời khiếu nại
+S09,CSKH,Nhân viên,yes,ChatGPT,personal,daily,customer_data,10,no,Trả lời Zalo
+S10,CSKH,Nhân viên,yes,Copilot,company,weekly,none,9,yes,Tổng hợp ticket
+S11,CSKH,Nhân viên,no,none,none,never,none,8,no,Gọi xác nhận đơn
+S12,Kho vận,Quản lý kho,yes,Gemini,personal,rarely,internal_docs,6,no,Báo cáo tồn kho
+S13,Kho vận,Nhân viên,no,none,none,never,none,5,no,Lập phiếu xuất kho
+S14,Kho vận,Điều phối,yes,ChatGPT,personal,weekly,internal_docs,7,no,Xếp lịch xe
+S15,Nhân sự,Trưởng phòng,yes,ChatGPT,personal,weekly,employee_data,6,no,Soạn JD và hợp đồng
+S16,Nhân sự,Nhân viên,yes,ChatGPT,personal,daily,employee_data,8,no,Trả lời câu hỏi nội quy
+S17,Mua hàng,Trưởng phòng,yes,Copilot,company,weekly,financial,5,yes,So sánh báo giá
+S18,Mua hàng,Nhân viên,no,none,none,never,none,7,no,Theo dõi đơn đặt hàng
+S19,Ban giám đốc,Giám đốc,yes,ChatGPT,personal,weekly,financial,4,no,Đọc báo cáo
+S20,Ban giám đốc,Phó giám đốc,yes,Copilot,company,daily,internal_docs,3,yes,Chuẩn bị họp
+S21,Marketing,Nhân viên,yes,ChatGPT,personal,daily,none,6,no,Viết bài Facebook
+S22,Marketing,Nhân viên,yes,Canva AI,personal,daily,none,5,no,Thiết kế banner
+S23,Kinh doanh,Nhân viên,yes,ChatGPT,personal,daily,customer_data,7,no,Tổng hợp doanh số
+S24,Kế toán,Nhân viên,yes,Gemini,personal,rarely,financial,6,no,Viết email nhắc nợ`;
+
+const priceList = `sku,product,unit,list_price,modern_trade,wholesale,horeca,traditional_trade,min_qty
+P001,Nước mắm Phú Quốc 500ml,chai,36000,32000,31000,33500,34500,24
+P002,Dầu ăn 1L,chai,46000,41000,39500,43000,44000,12
+P003,Gạo ST25 5kg,bao,160000,145000,139000,148000,152000,10
+P004,Mì gói thùng 30,thùng,108000,98000,94000,101000,104000,5
+P005,Nước ngọt lon thùng 24,thùng,182000,165000,158000,170000,175000,5
+P006,Sữa tươi 1L thùng 12,thùng,345000,312000,300000,320000,330000,5
+P007,Nước suối 500ml thùng 24,thùng,98000,89000,85000,91000,94000,10
+P008,Sữa đặc lon thùng 48,thùng,575000,520000,500000,530000,550000,2
+P009,Bột giặt 3kg,túi,118000,106000,101000,110000,113000,6
+P010,Nước rửa chén 800ml,chai,27000,24000,23000,25000,26000,12`;
+
+const deals = `deal_id,customer,segment,stage,value,probability,owner,created_date,last_activity,next_step,expected_close
+D-201,Siêu thị GreenMart,Modern trade,negotiation,420000000,70,Lan,2026-08-20,2026-10-24,Gửi báo giá Tết lần 2,2026-11-10
+D-202,Chuỗi tiện lợi 24h,Modern trade,proposal,650000000,50,Lan,2026-09-02,2026-10-05,Chờ phản hồi đề xuất mở rộng 20 cửa hàng,2026-10-31
+D-203,Khách sạn Majestic Bến Thành,Horeca,qualified,180000000,30,Minh,2026-09-15,2026-10-01,Hẹn demo sản phẩm,2026-11-20
+D-204,Bếp ăn công nghiệp Tân Thuận,Horeca,proposal,360000000,50,Minh,2026-09-10,2026-10-22,Đàm phán giá gạo ST25,2026-11-15
+D-205,Đại lý Hoàng Long,Wholesale,lead,250000000,10,Hùng,2026-10-10,2026-10-12,Gọi giới thiệu,2026-12-15
+D-206,Đại lý Thành Công,Wholesale,negotiation,300000000,70,Hùng,2026-08-01,2026-09-28,Chờ duyệt chiết khấu 6%,2026-10-15
+D-207,Chuỗi cà phê Hạt Nâu,Horeca,qualified,120000000,30,Minh,2026-09-25,2026-10-26,Gửi mẫu sữa đặc,2026-11-30
+D-208,Siêu thị Minh Phát,Modern trade,won,280000000,100,Lan,2026-07-15,2026-10-02,Đã ký hợp đồng,2026-10-02
+D-209,Trường quốc tế Sài Gòn Xanh,Horeca,proposal,200000000,50,Minh,2026-09-18,2026-09-30,Chờ kết quả đấu thầu,2026-10-25
+D-210,Hệ thống Bách hoá Phố,Modern trade,lead,500000000,10,Lan,2026-10-20,2026-10-27,Gửi hồ sơ năng lực,2027-01-15
+D-211,Đại lý Phú Quý,Wholesale,negotiation,220000000,70,Hùng,2026-09-05,2026-10-03,Chờ thanh toán công nợ cũ trước khi ký,2026-11-05
+D-212,Nhà hàng Sen Vàng,Horeca,lost,90000000,0,Minh,2026-08-10,2026-09-20,Mất vào đối thủ giá thấp hơn,2026-09-20
+D-213,Công ty suất ăn Phương Nam,Horeca,qualified,340000000,30,Hùng,2026-10-05,2026-10-25,Khảo sát bếp,2026-12-10
+D-214,Chuỗi cửa hàng Hoa Mai,Modern trade,proposal,260000000,50,Lan,2026-09-28,2026-10-20,Trình bày chương trình Tết,2026-11-25`;
+
+const bank = `txn_id,date,description,amount,direction
+BT01,2026-10-21,CK THANH TOAN INV-2611 SIEU THI MINH PHAT,38400000,credit
+BT02,2026-10-22,NHA HANG SEN VANG TT HOA DON THANG 9,21750000,credit
+BT03,2026-10-23,DAI LY PHU QUY CK,20000000,credit
+BT04,2026-10-24,KS RIVERSIDE PAYMENT INV2625,35600000,credit
+BT05,2026-10-24,CK TU TK 0123456789 NGUYEN VAN A,5000000,credit
+BT06,2026-10-25,CA PHE MOC TT INV-2632,20800000,credit
+BT07,2026-10-26,CA PHE MOC TT INV-2632,20800000,credit
+BT08,2026-10-26,TAP HOA CO BA THANH TOAN,4900000,credit
+BT09,2026-10-26,PHI QUAN LY TAI KHOAN THANG 10,22000,debit
+BT10,2026-10-27,TT NCC DAU THUC VAT NAM VIET PO-1189,150000000,debit
+BT11,2026-10-27,CHUOI TIEN LOI 24H CK TRUOC INV-2630,50000000,credit
+BT12,2026-10-28,LAI TIEN GUI KY HAN,185000,credit`;
+
+const expenses = `claim_id,employee,department,expense_date,submitted_date,category,amount,nights,pax,has_invoice,description
+E-01,Trần Hùng,Kinh doanh,2026-10-05,2026-10-07,taxi,185000,,,yes,Taxi đi gặp Đại lý Thành Công
+E-02,Trần Hùng,Kinh doanh,2026-10-05,2026-10-07,taxi,420000,,,no,Taxi Biên Hoà về TP.HCM
+E-03,Lê Lan,Kinh doanh,2026-10-08,2026-10-09,meal,2400000,,4,yes,Tiếp khách Siêu thị GreenMart
+E-04,Nguyễn Minh,Kinh doanh,2026-10-12,2026-10-14,hotel,1500000,2,,yes,Khách sạn Tây Ninh 2 đêm
+E-05,Nguyễn Minh,Kinh doanh,2026-10-12,2026-10-14,per_diem,800000,2,,no,Công tác phí Tây Ninh 2 ngày
+E-06,Phạm Thu,Kế toán,2026-09-10,2026-10-20,taxi,150000,,,yes,Taxi đi ngân hàng
+E-07,Võ Tâm,Kho vận,2026-10-15,2026-10-16,other,350000,,,no,Mua dây đai pallet
+E-08,Lê Lan,Kinh doanh,2026-10-18,2026-10-19,hotel,2100000,2,,yes,Khách sạn Đà Lạt hội nghị khách hàng
+E-09,Trần Hùng,Kinh doanh,2026-10-20,2026-10-21,taxi,210000,,,yes,Taxi đi Đại lý Phú Quý
+E-10,Trần Hùng,Kinh doanh,2026-10-20,2026-10-21,taxi,210000,,,yes,Taxi đi Đại lý Phú Quý
+E-11,Đỗ Nga,Nhân sự,2026-10-22,2026-10-23,meal,900000,,3,yes,Ăn trưa cùng ứng viên vòng cuối
+E-12,Nguyễn Minh,Kinh doanh,2026-10-24,2026-10-25,per_diem,150000,1,,no,Công tác phí nội thành
+E-13,Võ Tâm,Kho vận,2026-10-25,2026-10-26,taxi,95000,,,yes,Taxi chở mẫu hàng
+E-14,Phạm Thu,Kế toán,2026-10-26,2026-10-27,other,1800000,,,no,Gia hạn phần mềm kế toán`;
+
+const reviews = `review_id,date,source,customer,rating,product,order_id,text
+R01,2026-10-03,Google,Nhà hàng Sen Vàng,2,Gạo ST25 5kg,48203,Giao trễ 2 ngày phải mua gạo ngoài cho kịp tiệc.
+R02,2026-10-05,Zalo,Siêu thị GreenMart,4,Mì gói thùng 30,48204,Giao đúng hẹn nhân viên thân thiện. Thùng carton hơi mỏng.
+R03,2026-10-07,Facebook,Khách sạn Riverside,3,Nước suối 500ml thùng 24,48207,3 thùng bị móp đổi hàng nhanh nhưng mất công kiểm.
+R04,2026-10-09,Google,Đại lý Phú Quý,2,Dầu ăn 1L,48208,Trễ 2 ngày vì thiếu xe gọi hotline không ai nghe.
+R05,2026-10-10,Zalo,Chuỗi tiện lợi 24h,5,Nước ngọt lon thùng 24,48209,Giao chuẩn hoá đơn điện tử gửi ngay. Rất hài lòng.
+R06,2026-10-11,Google,Cà phê Mộc,4,Sữa đặc lon thùng 48,48210,Giá tốt hơn nhà cung cấp cũ mong có chiết khấu theo tháng.
+R07,2026-10-14,Shopee,Khách lẻ,1,Nước mắm Phú Quốc 500ml,,Chai bị rò rỉ hộp đóng gói sơ sài.
+R08,2026-10-16,Google,Siêu thị Minh Phát,5,Mì gói thùng 30,48211,Nhân viên kinh doanh hỗ trợ nhiệt tình.
+R09,2026-10-18,Zalo,Tạp hoá Anh Bảy,2,Nước mắm Phú Quốc 500ml,48212,Giao trễ xe máy giao hàng không gọi trước.
+R10,2026-10-20,Facebook,Khách lẻ,3,Gạo ST25 5kg,,Gạo ngon nhưng giá cao hơn chợ.
+R11,2026-10-22,Google,Siêu thị GreenMart,5,Sữa tươi 1L thùng 12,48214,Giao sớm hơn hẹn đóng gói chắc chắn.
+R12,2026-10-23,Shopee,Khách lẻ,2,Mì gói thùng 30,,Thùng rách thiếu 2 gói.
+R13,2026-10-24,Zalo,Chuỗi cửa hàng Hoa Mai,4,Nước suối 500ml thùng 24,48216,Ổn nhưng hoá đơn gửi chậm 3 ngày.
+R14,2026-10-26,Google,Đại lý Thành Công,3,Gạo ST25 5kg,48215,Trễ 2 ngày giá cạnh tranh.
+R15,2026-10-27,Facebook,Chuỗi tiện lợi 24h,3,Nước suối 500ml thùng 24,48218,Trễ 1 ngày làm trống kệ cuối tuần.
+R16,2026-10-28,Zalo,Nhà hàng Sen Vàng,1,Gạo ST25 5kg,48213,Đơn 48213 trễ gần 1 tuần không ai báo sẽ cân nhắc đổi nhà cung cấp.`;
+
 export function demoDataSources(ts: string): DataSource[] {
   return [
     { id: 'ds_customers', name: 'customers', description: 'Danh sách khách hàng B2B: phân khúc, thành phố, liên hệ, hạn mức tín dụng, người phụ trách', csv: customers, updatedAt: ts },
@@ -94,5 +197,11 @@ export function demoDataSources(ts: string): DataSource[] {
     { id: 'ds_receivables', name: 'receivables', description: 'Công nợ phải thu: hoá đơn, hạn thanh toán, số dư, số ngày quá hạn (tính đến 28/10/2026)', csv: receivables, updatedAt: ts },
     { id: 'ds_inventory', name: 'inventory', description: 'Tồn kho theo SKU: tồn thực tế, đã giữ, điểm đặt hàng lại, lead time, bán trung bình/ngày, nhà cung cấp', csv: inventory, updatedAt: ts },
     { id: 'ds_tickets', name: 'tickets', description: 'Ticket chăm sóc khách hàng tháng 10: kênh, loại, mức ưu tiên, trạng thái, giờ xử lý', csv: tickets, updatedAt: ts },
+    { id: 'ds_price_list', name: 'price_list', description: 'Bảng giá 2026 theo phân khúc (chưa VAT), đơn vị tính, số lượng tối thiểu', csv: priceList, updatedAt: ts },
+    { id: 'ds_deals', name: 'deals', description: 'Pipeline bán hàng: giai đoạn, giá trị, xác suất, người phụ trách, hoạt động gần nhất, bước tiếp theo', csv: deals, updatedAt: ts },
+    { id: 'ds_bank', name: 'bank_transactions', description: 'Sao kê ngân hàng 21–28/10/2026 (tiền vào/ra, nội dung chuyển khoản)', csv: bank, updatedAt: ts },
+    { id: 'ds_expenses', name: 'expenses', description: 'Đề nghị thanh toán chi phí tháng 10 (taxi, khách sạn, tiếp khách, công tác phí)', csv: expenses, updatedAt: ts },
+    { id: 'ds_reviews', name: 'reviews', description: 'Đánh giá khách hàng tháng 10 từ Google, Zalo, Facebook, Shopee', csv: reviews, updatedAt: ts },
+    { id: 'ds_ai_survey', name: 'ai_survey', description: 'Khảo sát sử dụng AI nội bộ (24 nhân viên): công cụ, loại tài khoản, dữ liệu đã đưa vào AI, số giờ việc lặp lại/tuần, đã được đào tạo chưa', csv: aiSurvey, updatedAt: ts },
   ];
 }

@@ -62,7 +62,8 @@ describe('agent workflows (mock provider runs real tools)', () => {
 
   it('demo sandbox exposes connected data sources and agent workflows', async () => {
     const view = await json(await app.request('/api/sandbox/demo'));
-    expect(view.dataSources.map((d: { name: string }) => d.name)).toEqual(['customers', 'orders', 'receivables', 'inventory', 'tickets']);
+    expect(view.dataSources.map((d: { name: string }) => d.name)).toEqual(['customers', 'orders', 'receivables', 'inventory', 'tickets', 'price_list', 'deals', 'bank_transactions', 'expenses', 'reviews', 'ai_survey']);
+    expect(view.workflows).toHaveLength(CATALOG.length);
     expect(view.dataSources[1].rows).toBeGreaterThan(15);
     expect(view.workflows.some((w: { id: string }) => w.id === 'order-care-agent')).toBe(true);
   });
@@ -167,5 +168,6 @@ describe('agent workflows (mock provider runs real tools)', () => {
     const view = await json(await app.request('/api/sandbox/demo'));
     expect(view.connectors).toEqual(['crm']);
     expect(view.dataSources[0].name).toBe('price_list');
+    expect(view.dataSources).toHaveLength(1);
   });
 });

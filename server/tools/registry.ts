@@ -22,6 +22,9 @@ export interface ToolExecution {
   isError?: boolean;
 }
 
+/** Lower-case and strip Vietnamese diacritics for matching. */
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
+
 const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : '');
 
 export const TOOL_DEFINITIONS: Record<ToolName, ToolDefinition> = {
@@ -167,14 +170,15 @@ export async function executeTool(name: string, input: unknown, ctx: ToolContext
         return { output: JSON.stringify({ count: rows.length, rows }) };
       }
       case 'search_knowledge': {
-        const q = str(inp.query, 200).toLowerCase();
+        // Accent-insensitive so "nghi phep" finds "nghỉ phép" (staff often type without diacritics).
+        const q = fold(str(inp.query, 200));
         const terms = q.split(/\s+/).filter((t) => t.length > 1);
         const hits: { title: string; passage: string; score: number }[] = [];
         for (const doc of ctx.workspace.knowledge) {
           const passages = doc.content.split(/\n{2,}|\n(?=[-•*\d])/).map((p) => p.trim()).filter(Boolean);
           for (const p of passages) {
-            const lower = p.toLowerCase();
-            const score = terms.reduce((n, t) => n + (lower.includes(t) ? 1 : 0), 0) + (lower.includes(q) ? 3 : 0);
+            const lower = ` ${fold(p)} `;
+            const score = terms.reduce((n, t) => n + (lower.includes(` ${t}`) ? 1 : 0), 0) + (q && lower.includes(q) ? 3 : 0) + (fold(doc.title).includes(q) ? 1 : 0);
             if (score > 0) hits.push({ title: doc.title, passage: p.slice(0, 600), score });
           }
         }

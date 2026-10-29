@@ -2,7 +2,7 @@ import type { WorkflowDef } from '../types.ts';
 import { WORKFLOW_ICONS } from '../icons.ts';
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
-const CATEGORIES = new Set(['operations', 'sales', 'marketing', 'finance', 'hr', 'customer-service', 'general']);
+const CATEGORIES = new Set(['operations', 'sales', 'marketing', 'finance', 'hr', 'customer-service', 'management', 'general']);
 const TOOLS = new Set(['query_records', 'aggregate_records', 'search_knowledge', 'create_ticket', 'draft_email', 'calculate', 'create_artifact', 'web_search']);
 const SKILLS = new Set(['xlsx', 'docx', 'pptx', 'pdf']);
 
@@ -91,6 +91,11 @@ export function validateWorkflow(wf: unknown): string[] {
       if (typeof w.chat.system !== 'string' || !w.chat.system.trim()) at('chat.system is required');
       if (!isL(w.chat.greeting)) at('chat.greeting must have vi and en');
       if (!Array.isArray(w.chat.starters) || w.chat.starters.length === 0 || !w.chat.starters.every(isL)) at('chat.starters must be a non-empty bilingual list');
+      if (w.chat.agent) {
+        if (!Array.isArray(w.chat.agent.tools) || !w.chat.agent.tools.length) at('chat.agent.tools must be a non-empty list');
+        else for (const tname of w.chat.agent.tools) if (!TOOLS.has(tname)) at(`chat.agent uses unknown tool "${tname}"`);
+        if (w.chat.agent.skills?.length) at('chat agents cannot use skills');
+      }
     }
   }
   return errs;

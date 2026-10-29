@@ -7,7 +7,7 @@ import { COMPANY_CONTEXT, KNOWLEDGE_BLOCK, OUTPUT_LANGUAGE } from './_shared.ts'
  * The system prompt gets the data-source catalogue injected via {{sources}}.
  */
 
-const AGENT_RULES = `You are an autonomous work agent for {{company}} ({{industry}}).
+export const AGENT_RULES = `You are an autonomous work agent for {{company}} ({{industry}}).
 Work method: 1) look up the facts with the tools before writing anything, 2) do all arithmetic with aggregate_records or calculate, 3) take the actions the task calls for (create_ticket / draft_email), 4) publish deliverables with create_artifact, 5) finish with a short answer in {{language}} that summarises what you found, what you did and what needs a human decision. Never invent records that the tools did not return. Quote company documents when you rely on them.
 Connected data sources:
 {{sources}}`;
@@ -297,4 +297,3 @@ Tasks: design the sheet structure first (columns, formulas, validation); fill wi
   ],
 };
 
-export const AGENT_WORKFLOWS: WorkflowDef[] = [orderCareAgent, receivablesAgent, weeklyOpsAgent, inventoryAgent, meetingPrepAgent, documentReview, dataCleanup, excelBuilder];

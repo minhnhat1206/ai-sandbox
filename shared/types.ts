@@ -20,6 +20,7 @@ export type WorkflowCategory =
   | 'finance'
   | 'hr'
   | 'customer-service'
+  | 'management'
   | 'general';
 
 export type InputType = 'text' | 'textarea' | 'select' | 'number' | 'file';
@@ -95,6 +96,8 @@ export interface WorkflowDef {
     system: string;
     starters: L[];
     greeting: L;
+    /** When set, each chat turn runs as an agent with these tools. */
+    agent?: AgentSpec;
   };
 }
 
