@@ -402,6 +402,24 @@ code, .mono { font-family: var(--f-mono); font-size: .86em; }
 .phase .whynow { font-size: 12.5px; color: var(--ink); background: var(--amber-wash); border-radius: 8px; padding: 7px 9px; line-height: 1.45; }
 .phase .whynow b { color: var(--amber); }
 
+
+/* ---------- notice: the sandbox is a sales tool ---------- */
+.notice { border: 2px solid var(--amber); background: var(--amber-wash); border-radius: var(--r-lg); padding: clamp(16px, 2.5vw, 24px); display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 560px) { .notice { grid-template-columns: 1fr; gap: 10px; } }
+.notice .tile { width: 44px; height: 44px; background: var(--sheet); color: var(--amber); }
+.notice .tag { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--amber); }
+.notice h2 { font-size: clamp(20px, 2.6vw, 26px); margin-top: 4px; }
+.notice p { font-size: 15px; color: var(--ink); line-height: 1.6; margin-top: 8px; max-width: 80ch; }
+.money { display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr) 26px minmax(0, 1.3fr); gap: 8px; align-items: stretch; margin-top: 14px; }
+@media (max-width: 820px) { .money { grid-template-columns: 1fr; } .money .to { transform: rotate(90deg); justify-self: start; margin-left: 12px; } }
+.money > div:not(.to) { border-radius: var(--r); padding: 10px 12px; display: grid; gap: 3px; align-content: start; background: var(--sheet); border: 1px solid var(--amber-line); }
+.money > div.main:not(.to) { border: 2px solid var(--jade); }
+.money small { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.money b { font-size: 14.5px; color: var(--jade-deep); line-height: 1.3; }
+.money span { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.money .to { display: grid; place-items: center; color: var(--amber); }
+.notice-band { padding-block: 0 clamp(36px, 5vw, 56px); }
+
 footer.foot { padding-block: 26px 40px; border-top: 1px solid var(--grid); font-size: 12.5px; color: var(--ink-3); background: var(--sheet); }
 footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 </style>
@@ -441,6 +459,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
     <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5z"/></symbol>
     <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9 16h-18z"/><path d="M12 10v4"/><path d="M12 17.2h.01"/></symbol>
     <symbol id="i-mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#137a62" stroke="none"/><path d="M9 23c0-9 6-14 14-15-1 8-5 14-14 15z" fill="#ffffff" stroke="none"/><circle cx="23" cy="8.5" r="2.2" fill="#f4c15d" stroke="none"/></symbol>
   </defs>
 </svg>
@@ -452,6 +471,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
       <span><b>AI Sandbox</b><small>Working name · product blueprint</small></span>
     </a>
     <nav aria-label="Sections">
+      <a href="#note">Important</a>
       <a href="#why">Why</a>
       <a href="#journey">Journey</a>
       <a href="#screen">The screen</a>
@@ -503,6 +523,29 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
 </section>
 
 
+
+<!-- ===================== IMPORTANT NOTE ===================== -->
+<section class="notice-band" id="note" aria-labelledby="note-title">
+  <div class="wrap">
+    <div class="notice" role="note">
+      <span class="tile"><svg class="i" aria-hidden="true"><use href="#i-alert"/></svg></span>
+      <div>
+        <span class="tag">Important</span>
+        <h2 id="note-title">The sandbox is a tool to build trust, not the product we sell</h2>
+        <p>It exists for one reason: so a prospect can understand what AI would do for their company and trust us enough to work with us. We never charge for it, never sell it as a platform or a subscription, and keep its cost to us capped at USD 10 per company. Every feature on this page is judged by one question: does it help a prospect say yes to working with us?</p>
+        <p>Our revenue comes from the services the sandbox leads to.</p>
+        <div class="money" aria-label="Where the money comes from">
+          <div><small>Free · cost to us</small><b>Sandbox trial</b><span>Understand and trust. Capped at USD 10 of AI per company.</span></div>
+          <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+          <div><small>First paid step</small><b>AI Kickstart</b><span>2-hour hands-on team session, from USD 250 (about 6.5M VND) in Vietnam.</span></div>
+          <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
+          <div class="main"><small>Main revenue</small><b>Assessment, Build, Sprint, Retainer</b><span>Readiness assessments, custom assistants and integrations, 90-day adoption sprints and monthly retainers (zone C prices in the business plan: USD 1,000 to 8,000 per project, USD 600 to 1,500 per month).</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===================== WHY ===================== -->
 <section class="band" id="why" aria-labelledby="w-title">
   <div class="wrap">
@@ -550,7 +593,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
         <div class="sol"><small>So we built</small><b>Random links, rate limits and a USD 10 cap per company</b><span>USD 10 is the most we accept to spend to win one Kickstart, so the server enforces it.</span><a href="#security">See the controls</a></div>
       </div>
       <div class="reason">
-        <div class="prob"><small>Constraint</small><b>Year 1 of the business plan says: do not build our own AI platform.</b><span>The engineer has 5–10 hours a week. Platform work must stay small and serve sales directly.</span></div>
+        <div class="prob"><small>Constraint</small><b>Year 1 of the business plan says: do not build our own AI platform.</b><span>The sandbox is a sales tool, not a product to monetise. The engineer has 5–10 hours a week, so platform work must stay small and serve sales directly.</span></div>
         <div class="to" aria-hidden="true"><svg class="i"><use href="#i-arrow"/></svg></div>
         <div class="sol"><small>So we built</small><b>One Node process, a JSON file store, workflows as data</b><span>Nothing to operate beyond one small server; new agents are added as data, not screens.</span><a href="#architecture">See the architecture</a></div>
       </div>
@@ -952,7 +995,7 @@ footer.foot .wrap { display: flex; justify-content: space-between; gap: 12px; fl
 
 <footer class="foot">
   <div class="wrap">
-    <span>AI Sandbox (working name) · product and technical blueprint · 29 Oct 2026</span>
+    <span>AI Sandbox (working name) · a free trust-building tool for our services, not a product for sale · 29 Oct 2026</span>
     <span>Figures from the demo data and the automated tests</span>
   </div>
 </footer>
