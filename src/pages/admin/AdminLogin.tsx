@@ -4,7 +4,7 @@ import { LangToggle, Logo, Mark } from '@/components/Logo';
 import { Alert, Button, Field, Input } from '@/components/ui';
 import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
-import { adminApi, setAdminToken } from '@/lib/api';
+import { adminApi, ApiError, setAdminToken } from '@/lib/api';
 
 export default function AdminLogin() {
   const { t } = useLang();
@@ -20,8 +20,8 @@ export default function AdminLogin() {
       await adminApi.login(token);
       setAdminToken(token);
       nav('/admin');
-    } catch {
-      setError(t('ad_login_bad'));
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 429 ? t('ad_login_locked') : t('ad_login_bad'));
     } finally {
       setBusy(false);
     }

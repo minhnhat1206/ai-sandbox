@@ -3,13 +3,14 @@
  * comes from a real tool call on the sandbox data; only the narration is canned.
  */
 import { parseCsv, toCsv, toNumber, type Row } from '../../shared/engine/csv.ts';
-import { addDays, compact, daysBetween, esc, fmt, fold, html, kpi, pct, rowsOf, svgBars, T, tableHtml, TODAY, type Script, type ScriptCtx } from './mock-kit.ts';
+import { addDays, compact, daysBetween, esc, fmt, fold, html, kpi, pct, rowsOf, svgBars, T, tableHtml, monthOf, segCol, type Script, type ScriptCtx } from './mock-kit.ts';
 
 const num = (v: unknown) => toNumber(v) ?? 0;
 const all = async (c: ScriptCtx, source: string, extra: Record<string, unknown> = {}) => rowsOf((await c.call('query_records', { source, limit: 50, ...extra })).data);
 const agg = async (c: ScriptCtx, args: Record<string, unknown>) => rowsOf((await c.call('aggregate_records', { limit: 50, ...args })).data);
 const calc = async (c: ScriptCtx, expression: string) => num(((await c.call('calculate', { expression })).data as { value?: number }).value);
-const SEG_COL: Record<string, string> = { 'Modern trade': 'modern_trade', Wholesale: 'wholesale', Horeca: 'horeca', 'Traditional trade': 'traditional_trade' };
+/** Segment price for a price-list row, falling back to the list price. */
+const segPrice = (p: Row, segment: string | undefined) => num(p[segCol(segment)] ?? p.list_price) || num(p.list_price);
 
 function findCustomer(customers: Row[], text: string): Row | undefined {
   const f = fold(text);
@@ -41,7 +42,7 @@ const quoteBuilder: Script = async (c) => {
   const cust = findCustomer(customers, req);
   const prices = await all(c, 'price_list');
   const policy = (await c.call('search_knowledge', { query: 'chiết khấu giá trị đơn hạn mức tín dụng VAT', limit: 4 })).data as { results?: { title: string; passage: string }[] };
-  const col = SEG_COL[cust?.segment ?? ''] ?? 'list_price';
+
   const lines = req.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^[-•*]|^\d/.test(l));
   c.say('Kiểm tra tồn kho từng mặt hàng.', 'Checking stock for each line.');
   const quoteLines: Record<string, string | number>[] = [];
@@ -52,14 +53,16 @@ const quoteBuilder: Script = async (c) => {
     if (!p || !qty) continue;
     const inv = (await all(c, 'inventory', { where: [{ field: 'sku', op: 'eq', value: p.sku }] }))[0];
     const available = num(inv?.on_hand) - num(inv?.reserved);
-    const unit = num(p[col]);
+    const unit = segPrice(p, cust?.segment);
     const short = Math.max(0, qty - available);
-    const eta = short ? addDays(TODAY, num(inv?.lead_time_days) + 3) : addDays(TODAY, 3);
+    const eta = short ? addDays(c.today, num(inv?.lead_time_days) + 3) : addDays(c.today, 3);
     if (short) shortages.push(`${p.product}: thiếu ${fmt(short)} ${p.unit} (tồn khả dụng ${fmt(available)}, nhập về ~${num(inv?.lead_time_days)} ngày)`);
     quoteLines.push({ sku: p.sku, product: p.product, unit: p.unit, qty, unit_price: unit, amount: qty * unit, available, delivery: short ? `${eta} (chờ nhập ${fmt(short)})` : eta });
   }
   const subtotal = await calc(c, quoteLines.map((q) => q.amount).join(' + ') || '0');
-  const isWholesale = cust?.segment === 'Wholesale';
+  const policyText = (policy.results ?? []).map((r) => r.passage).join('\n');
+  const bonusSegment = /Khách\s+(.+?)\s+được cộng thêm 1%/.exec(policyText)?.[1]?.trim();
+  const isWholesale = !!cust?.segment && cust.segment === bonusSegment;
   const rate = (subtotal >= 300_000_000 ? 4 : subtotal >= 100_000_000 ? 2 : 0) + (isWholesale && subtotal >= 100_000_000 ? 1 : 0);
   const discount = await calc(c, `round(${subtotal} * ${rate} / 100)`);
   const vat = await calc(c, `round((${subtotal} - ${discount}) * 0.08)`);
@@ -74,21 +77,21 @@ const quoteBuilder: Script = async (c) => {
   const needsApproval = rate > 5 || overLimit || overdue30.length > 0;
   const actions: string[] = [];
   if (needsApproval) {
-    const tk = (await c.call('create_ticket', { customer: cust?.name ?? '', subject: `Duyệt báo giá ${cust?.name ?? ''} ${fmt(total)} đ`, priority: 'high', summary: `${overLimit ? `Công nợ + đơn = ${fmt(exposure)} đ vượt hạn mức ${fmt(limit)} đ. ` : ''}${overdue30.length ? `Có ${overdue30.length} hoá đơn quá hạn > 30 ngày. ` : ''}${rate > 5 ? `Chiết khấu ${rate}% > 5%. ` : ''}Cần duyệt trước khi gửi.`, assignee: overLimit || overdue30.length ? 'Kế toán trưởng' : 'Giám đốc kinh doanh', dueDate: addDays(TODAY, 1) })).data as { ticketId?: string };
+    const tk = (await c.call('create_ticket', { customer: cust?.name ?? '', subject: `Duyệt báo giá ${cust?.name ?? ''} ${fmt(total)} đ`, priority: 'high', summary: `${overLimit ? `Công nợ + đơn = ${fmt(exposure)} đ vượt hạn mức ${fmt(limit)} đ. ` : ''}${overdue30.length ? `Có ${overdue30.length} hoá đơn quá hạn > 30 ngày. ` : ''}${rate > 5 ? `Chiết khấu ${rate}% > 5%. ` : ''}Cần duyệt trước khi gửi.`, assignee: overLimit || overdue30.length ? 'Kế toán trưởng' : 'Giám đốc kinh doanh', dueDate: addDays(c.today, 1) })).data as { ticketId?: string };
     actions.push(`Ticket duyệt ${tk.ticketId}`);
   }
   if (shortages.length) {
-    const tk = (await c.call('create_ticket', { customer: cust?.name ?? '', subject: `Thiếu hàng cho báo giá ${cust?.name ?? ''}`, priority: 'high', summary: `Cần đặt bổ sung / giữ hàng:\n${shortages.join('\n')}`, assignee: 'Phòng Mua hàng', dueDate: addDays(TODAY, 1) })).data as { ticketId?: string };
+    const tk = (await c.call('create_ticket', { customer: cust?.name ?? '', subject: `Thiếu hàng cho báo giá ${cust?.name ?? ''}`, priority: 'high', summary: `Cần đặt bổ sung / giữ hàng:\n${shortages.join('\n')}`, assignee: 'Phòng Mua hàng', dueDate: addDays(c.today, 1) })).data as { ticketId?: string };
     actions.push(`Ticket mua hàng ${tk.ticketId}`);
   }
-  const qno = `BG-${TODAY.replace(/-/g, '').slice(2)}-${(cust?.customer_id ?? 'X').replace(/\D/g, '')}`;
+  const qno = `BG-${c.today.replace(/-/g, '').slice(2)}-${(cust?.customer_id ?? 'X').replace(/\D/g, '')}`;
   const rowsHtml = quoteLines.map((q, i) => ({ '#': i + 1, 'Mặt hàng': q.product, 'ĐVT': q.unit, 'Số lượng': fmt(num(q.qty)), 'Đơn giá': fmt(num(q.unit_price)), 'Thành tiền': fmt(num(q.amount)), 'Giao dự kiến': q.delivery }));
   await c.call('create_artifact', {
     kind: 'html', title: 'Quotation',
-    content: html(`BÁO GIÁ ${qno}`, `Ngày ${TODAY} · Hiệu lực ${validity} ngày (đến ${addDays(TODAY, validity)}) · Giá chưa gồm VAT 8%`, `<div class="grid">${kpi('Khách hàng', cust?.name ?? '—', `${cust?.segment ?? ''} · ${cust?.contact ?? ''}`)}${kpi('Tổng thanh toán', `${fmt(total)} đ`, `gồm VAT ${fmt(vat)} đ`)}${kpi('Chiết khấu', `${rate}%`, `${fmt(discount)} đ`)}${kpi('Người phụ trách', cust?.account_manager ?? '—', 'Việt Minh Distribution')}</div><div class="card"><h2>Chi tiết</h2>${tableHtml(['#', 'Mặt hàng', 'ĐVT', 'Số lượng', 'Đơn giá', 'Thành tiền', 'Giao dự kiến'], rowsHtml)}<table style="margin-top:12px;max-width:360px;margin-left:auto"><tr><td>Cộng tiền hàng</td><td style="text-align:right">${fmt(subtotal)}</td></tr><tr><td>Chiết khấu ${rate}%</td><td style="text-align:right">-${fmt(discount)}</td></tr><tr><td>VAT 8%</td><td style="text-align:right">${fmt(vat)}</td></tr><tr><td><b>Tổng thanh toán</b></td><td style="text-align:right"><b>${fmt(total)}</b></td></tr></table></div><div class="card"><h2>Điều khoản</h2><p>Giao tại kho khách trong 3 ngày làm việc với hàng có sẵn. ${shortages.length ? `<span class="tag warn">Một số mặt hàng chờ nhập</span>` : ''} Thanh toán theo hạn mức tín dụng hiện hành. Báo giá có hiệu lực ${validity} ngày.</p></div>`),
+    content: html(`BÁO GIÁ ${qno}`, `Ngày ${c.today} · Hiệu lực ${validity} ngày (đến ${addDays(c.today, validity)}) · Giá chưa gồm VAT 8%`, `<div class="grid">${kpi('Khách hàng', cust?.name ?? '—', `${cust?.segment ?? ''} · ${cust?.contact ?? ''}`)}${kpi('Tổng thanh toán', `${fmt(total)} đ`, `gồm VAT ${fmt(vat)} đ`)}${kpi('Chiết khấu', `${rate}%`, `${fmt(discount)} đ`)}${kpi('Người phụ trách', cust?.account_manager ?? '—', c.company)}</div><div class="card"><h2>Chi tiết</h2>${tableHtml(['#', 'Mặt hàng', 'ĐVT', 'Số lượng', 'Đơn giá', 'Thành tiền', 'Giao dự kiến'], rowsHtml)}<table style="margin-top:12px;max-width:360px;margin-left:auto"><tr><td>Cộng tiền hàng</td><td style="text-align:right">${fmt(subtotal)}</td></tr><tr><td>Chiết khấu ${rate}%</td><td style="text-align:right">-${fmt(discount)}</td></tr><tr><td>VAT 8%</td><td style="text-align:right">${fmt(vat)}</td></tr><tr><td><b>Tổng thanh toán</b></td><td style="text-align:right"><b>${fmt(total)}</b></td></tr></table></div><div class="card"><h2>Điều khoản</h2><p>Giao tại kho khách trong 3 ngày làm việc với hàng có sẵn. ${shortages.length ? `<span class="tag warn">Một số mặt hàng chờ nhập</span>` : ''} Thanh toán theo hạn mức tín dụng hiện hành. Báo giá có hiệu lực ${validity} ngày.</p></div>`),
   });
   await c.call('create_artifact', { kind: 'table', title: 'Quote lines', columns: ['sku', 'product', 'unit', 'qty', 'unit_price', 'amount', 'available', 'delivery'], rows: quoteLines });
-  await c.call('draft_email', { to: cust?.email || cust?.name || 'khách hàng', subject: `Báo giá ${qno} – ${cust?.name ?? ''}`, body: `Kính gửi ${cust?.contact ?? 'Quý khách'},\n\nCảm ơn ${cust?.name ?? 'Quý khách'} đã gửi yêu cầu. Chúng tôi gửi báo giá ${qno} cho ${quoteLines.length} mặt hàng, tổng thanh toán ${fmt(total)} đ (đã gồm chiết khấu ${rate}% và VAT 8%).\n\n${quoteLines.map((q) => `- ${q.product}: ${fmt(num(q.qty))} ${q.unit} × ${fmt(num(q.unit_price))} đ, giao ${q.delivery}`).join('\n')}\n\n${shortages.length ? 'Một số mặt hàng cần nhập thêm; chúng tôi sẽ xác nhận lịch giao cụ thể trong 24 giờ.\n\n' : ''}Báo giá có hiệu lực đến ${addDays(TODAY, validity)}.\n\nTrân trọng,\n${cust?.account_manager ?? ''} – Phòng Kinh doanh` });
+  await c.call('draft_email', { to: cust?.email || cust?.name || 'khách hàng', subject: `Báo giá ${qno} – ${cust?.name ?? ''}`, body: `Kính gửi ${cust?.contact ?? 'Quý khách'},\n\nCảm ơn ${cust?.name ?? 'Quý khách'} đã gửi yêu cầu. Chúng tôi gửi báo giá ${qno} cho ${quoteLines.length} mặt hàng, tổng thanh toán ${fmt(total)} đ (đã gồm chiết khấu ${rate}% và VAT 8%).\n\n${quoteLines.map((q) => `- ${q.product}: ${fmt(num(q.qty))} ${q.unit} × ${fmt(num(q.unit_price))} đ, giao ${q.delivery}`).join('\n')}\n\n${shortages.length ? 'Một số mặt hàng cần nhập thêm; chúng tôi sẽ xác nhận lịch giao cụ thể trong 24 giờ.\n\n' : ''}Báo giá có hiệu lực đến ${addDays(c.today, validity)}.\n\nTrân trọng,\n${cust?.account_manager ?? ''} – Phòng Kinh doanh` });
   void policy;
   return T(c.lang,
     `**Báo giá ${qno}** cho ${cust?.name ?? '(chưa nhận diện được khách)'} (${cust?.segment ?? ''}): ${quoteLines.length} mặt hàng, tiền hàng ${fmt(subtotal)} đ, chiết khấu **${rate}%** theo chính sách, tổng thanh toán **${fmt(total)} đ**. Công nợ hiện tại ${fmt(openBal)} đ + đơn này = ${fmt(exposure)} đ ${overLimit ? `**vượt** hạn mức ${fmt(limit)} đ` : `trong hạn mức ${fmt(limit)} đ`}. ${shortages.length ? `Thiếu hàng: ${shortages.join('; ')}.` : 'Đủ tồn kho.'} Đã thực hiện: ${actions.join(', ') || 'không cần duyệt'}, email báo giá chờ bạn duyệt gửi.`,
@@ -118,35 +121,35 @@ const inboxTriage: Script = async (c) => {
       const amount = num(/(\d+)\s*(tr|trieu)/.exec(f)?.[1]) * 1_000_000;
       facts = `${inv.length} hoá đơn mở: ${inv.map((r) => `${r.invoice_id} ${fmt(num(r.balance))} đ (${r.days_overdue} ngày)`).join(', ')}`;
       priority = inv.some((r) => num(r.days_overdue) > 30) ? 'high' : 'normal';
-      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: `Đối soát khoản ${fmt(amount)} đ của ${cust?.name ?? sender}`, priority, summary: `Khách báo đã chuyển ${fmt(amount)} đ. Không khớp đúng hoá đơn nào: ${facts}. Cần kế toán phân bổ và gửi đối chiếu công nợ.`, assignee: 'Kế toán công nợ', dueDate: addDays(TODAY, 1) })).data as { ticketId?: string };
+      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: `Đối soát khoản ${fmt(amount)} đ của ${cust?.name ?? sender}`, priority, summary: `Khách báo đã chuyển ${fmt(amount)} đ. Không khớp đúng hoá đơn nào: ${facts}. Cần kế toán phân bổ và gửi đối chiếu công nợ.`, assignee: 'Kế toán công nợ', dueDate: addDays(c.today, 1) })).data as { ticketId?: string };
       const em = (await c.call('draft_email', { to: cust?.email || sender, subject: `Xác nhận khoản thanh toán ${fmt(amount)} đ`, body: `Kính gửi ${cust?.name ?? 'Quý khách'},\n\nChúng tôi đã nhận thông tin chuyển khoản ${fmt(amount)} đ. Hiện công nợ mở gồm:\n${inv.map((r) => `- ${r.invoice_id}: ${fmt(num(r.balance))} đ, quá hạn ${r.days_overdue} ngày`).join('\n')}\n\nNhờ Quý khách xác nhận khoản thanh toán áp vào hoá đơn nào; kế toán sẽ gửi biên bản đối chiếu trong ngày.\n\nTrân trọng,\nPhòng Kế toán` })).data as { draftId?: string };
       action = `${tk.ticketId} + ${em.draftId}`;
     } else if (/chua thay|tre|ro ri|hong|huy|doi giup|loi/.test(f)) {
       type = 'complaint';
       const order = orderId ? (await all(c, 'orders', { where: [{ field: 'order_id', op: 'eq', value: orderId }] }))[0] : cust ? (await all(c, 'orders', { where: [{ field: 'customer_id', op: 'eq', value: cust.customer_id }], sort: { field: 'order_date', dir: 'desc' }, limit: 1 }))[0] : undefined;
-      const late = order && !order.delivered_date ? daysBetween(order.promised_date, TODAY) : 0;
+      const late = order && !order.delivered_date ? daysBetween(order.promised_date, c.today) : 0;
       priority = late > 3 || /huy/.test(f) ? 'urgent' : 'high';
       facts = order ? `Đơn ${order.order_id} ${order.product} – ${order.status}${late > 0 ? `, trễ ${late} ngày` : ''}` : 'Không tìm thấy đơn';
-      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: /ro ri|doi/.test(f) ? `Đổi hàng lỗi – ${cust?.name ?? sender}` : `Đơn ${order?.order_id ?? ''} trễ – ${cust?.name ?? sender}`, priority, summary: `${body.slice(0, 300)}\n\nDữ liệu: ${facts}.`, assignee: /ro ri|doi/.test(f) ? 'Kho vận' : 'Trưởng ca giao nhận', dueDate: TODAY })).data as { ticketId?: string };
+      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: /ro ri|doi/.test(f) ? `Đổi hàng lỗi – ${cust?.name ?? sender}` : `Đơn ${order?.order_id ?? ''} trễ – ${cust?.name ?? sender}`, priority, summary: `${body.slice(0, 300)}\n\nDữ liệu: ${facts}.`, assignee: /ro ri|doi/.test(f) ? 'Kho vận' : 'Trưởng ca giao nhận', dueDate: c.today })).data as { ticketId?: string };
       const em = (await c.call('draft_email', { to: cust?.email || sender, subject: /ro ri|doi/.test(f) ? 'Đổi hàng lỗi' : `Đơn ${order?.order_id ?? ''} – cập nhật giao hàng`, body: /ro ri|doi/.test(f) ? `Dạ chào ${cust?.contact ?? 'anh/chị'}, em xin lỗi vì hàng bị lỗi. Bên em sẽ đổi mới trong lần giao tới (ticket ${tk.ticketId}), anh/chị giữ giúp em chai lỗi để đối chiếu ạ.` : `Dạ chào ${cust?.contact ?? 'anh/chị'}, em rất xin lỗi vì đơn ${order?.order_id ?? ''} ${late > 0 ? `trễ ${late} ngày` : 'chưa đến'}. Bộ phận giao nhận đang xử lý gấp (ticket ${tk.ticketId}) và sẽ gọi lại anh/chị trước 17:00 hôm nay. Nếu không kịp, bên em hoàn tiền 100% theo chính sách.` })).data as { draftId?: string };
       action = `${tk.ticketId} + ${em.draftId}`;
     } else if (/dat them|dat hang|xac nhan/.test(f)) {
       type = 'order';
-      const qty = num(/(\d[\d.]*)\s*(thung|bao|chai)/.exec(f)?.[1]);
+      const qty = num(/(\d[\d.]*)\s*[a-z]/.exec(f)?.[1]);
       const p = matchProduct(prices, body);
       const inv = p ? (await all(c, 'inventory', { where: [{ field: 'sku', op: 'eq', value: p.sku }] }))[0] : undefined;
       const available = num(inv?.on_hand) - num(inv?.reserved);
-      const unit = p ? num(p[SEG_COL[cust?.segment ?? ''] ?? 'list_price']) : 0;
+      const unit = p ? segPrice(p, cust?.segment) : 0;
       facts = `${p?.product ?? '?'} × ${fmt(qty)}: tồn khả dụng ${fmt(available)}, giá ${fmt(unit)} đ → ${fmt(unit * qty)} đ`;
       priority = 'high';
-      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: `Giữ hàng ${fmt(qty)} ${p?.unit ?? ''} ${p?.product ?? ''} cho ${cust?.name ?? sender}`, priority, summary: facts, assignee: 'Kho vận', dueDate: TODAY })).data as { ticketId?: string };
+      const tk = (await c.call('create_ticket', { customer: cust?.name ?? sender, subject: `Giữ hàng ${fmt(qty)} ${p?.unit ?? ''} ${p?.product ?? ''} cho ${cust?.name ?? sender}`, priority, summary: facts, assignee: 'Kho vận', dueDate: c.today })).data as { ticketId?: string };
       const em = (await c.call('draft_email', { to: cust?.email || sender, subject: `Xác nhận đơn bổ sung ${p?.product ?? ''}`, body: `Chào anh ${cust?.contact ?? ''},\n\nBên em xác nhận ${fmt(qty)} ${p?.unit ?? ''} ${p?.product ?? ''}, đơn giá ${fmt(unit)} đ, thành tiền ${fmt(unit * qty)} đ (chưa VAT). ${available >= qty ? 'Hàng có sẵn, giao thứ Sáu như yêu cầu.' : 'Hiện chưa đủ hàng, bên em sẽ báo lịch giao trong hôm nay.'}\n\nTrân trọng.` })).data as { draftId?: string };
       action = `${tk.ticketId} + ${em.draftId}`;
     } else if (/bao gia|price|gia /.test(f)) {
       type = 'price_request';
-      const qty = num(/(\d[\d.]*)\s*(bags?|bao|thung|cartons?)/.exec(f)?.[1]);
+      const qty = num(/(\d[\d.]*)\s*[a-z]/.exec(f)?.[1]);
       const p = matchProduct(prices, body.replace(/rice/i, 'gạo'));
-      const unit = p ? num(p[SEG_COL[cust?.segment ?? ''] ?? 'list_price']) : 0;
+      const unit = p ? segPrice(p, cust?.segment) : 0;
       facts = `${p?.product ?? '?'} giá ${cust?.segment ?? ''}: ${fmt(unit)} đ × ${fmt(qty)} = ${fmt(unit * qty)} đ`;
       const em = (await c.call('draft_email', { to: cust?.email || sender, subject: `Quotation – ${p?.product ?? ''}`, body: `Dear ${cust?.contact ?? 'Sir/Madam'},\n\nThank you for your enquiry. Our price for ${fmt(qty)} × ${p?.product ?? ''} is ${fmt(unit)} VND per ${p?.unit ?? 'unit'}, ${fmt(unit * qty)} VND in total excluding 8% VAT, valid for 15 days. December delivery can be scheduled on your confirmation.\n\nBest regards,\n${cust?.account_manager ?? 'Sales team'}` })).data as { draftId?: string };
       action = `${em.draftId}`;
@@ -214,7 +217,7 @@ const bankRecon: Script = async (c) => {
   const exceptions = out.filter((o) => ['duplicate', 'ambiguous', 'unidentified', 'overpaid'].includes(String(o.status)));
   c.say('Mở ticket cho ngoại lệ và soạn email xác nhận.', 'Opening tickets for exceptions and drafting confirmations.');
   for (const e of exceptions) {
-    await c.call('create_ticket', { customer: String(e.customer || '—'), subject: `Đối soát: ${e.status} ${e.txn} ${fmt(num(e.amount))} đ`, priority: e.status === 'duplicate' ? 'high' : 'normal', summary: `${e.memo}\n${e.note}`, assignee: 'Kế toán công nợ', dueDate: addDays(TODAY, 2) });
+    await c.call('create_ticket', { customer: String(e.customer || '—'), subject: `Đối soát: ${e.status} ${e.txn} ${fmt(num(e.amount))} đ`, priority: e.status === 'duplicate' ? 'high' : 'normal', summary: `${e.memo}\n${e.note}`, assignee: 'Kế toán công nợ', dueDate: addDays(c.today, 2) });
   }
   for (const e of out.filter((o) => ['partial', 'duplicate'].includes(String(o.status)))) {
     const cust = customers.find((cu) => cu.name === e.customer);
@@ -240,7 +243,7 @@ const pipelineReview: Script = async (c) => {
   const weighted = await calc(c, open.map((d) => `${num(d.value)} * ${num(d.probability)} / 100`).join(' + ') || '0');
   const gap = Math.max(1, target - won);
   const coverage = await calc(c, `round(${weighted} / ${gap} * 100) / 100`);
-  const risk = new Map<Row, { idle: number; slipped: boolean }>(open.map((d) => [d, { idle: daysBetween(d.last_activity, TODAY), slipped: d.expected_close < TODAY }]));
+  const risk = new Map<Row, { idle: number; slipped: boolean }>(open.map((d) => [d, { idle: daysBetween(d.last_activity, c.today), slipped: d.expected_close < c.today }]));
   const atRisk = open.filter((d) => risk.get(d)!.idle >= idle || risk.get(d)!.slipped).sort((a, b) => num(b.value) - num(a.value));
   c.say('Đối chiếu công nợ của các khách có cơ hội đang nguội.', 'Cross-checking debt for at-risk customers.');
   const tasks: Record<string, string | number>[] = [];
@@ -250,7 +253,7 @@ const pipelineReview: Script = async (c) => {
     const overdue = debt.filter((r) => num(r.days_overdue) > 0).reduce((n, r) => n + num(r.balance), 0);
     const { idle: idleDays, slipped } = risk.get(d)!;
     const reason = [idleDays >= idle ? `${idleDays} ngày không hoạt động` : '', slipped ? `quá ngày chốt ${d.expected_close}` : '', overdue ? `nợ quá hạn ${fmt(overdue)} đ` : ''].filter(Boolean).join('; ');
-    const tk = (await c.call('create_ticket', { customer: d.customer, subject: `Follow-up ${d.deal_id} ${d.customer} (${compact(num(d.value))})`, priority: num(d.value) >= 300_000_000 ? 'high' : 'normal', summary: `${reason}. Bước tiếp theo đã ghi: "${d.next_step}". ${overdue ? 'Xử lý công nợ trước khi chốt.' : 'Gọi lại và cập nhật ngày chốt.'}`, assignee: d.owner, dueDate: addDays(TODAY, 2) })).data as { ticketId?: string };
+    const tk = (await c.call('create_ticket', { customer: d.customer, subject: `Follow-up ${d.deal_id} ${d.customer} (${compact(num(d.value))})`, priority: num(d.value) >= 300_000_000 ? 'high' : 'normal', summary: `${reason}. Bước tiếp theo đã ghi: "${d.next_step}". ${overdue ? 'Xử lý công nợ trước khi chốt.' : 'Gọi lại và cập nhật ngày chốt.'}`, assignee: d.owner, dueDate: addDays(c.today, 2) })).data as { ticketId?: string };
     tasks.push({ deal: d.deal_id, customer: d.customer, owner: d.owner, stage: d.stage, value: num(d.value), idle_days: idleDays, reason, task: tk.ticketId ?? '' });
   }
   for (const d of atRisk.slice(0, 3)) {
@@ -263,7 +266,7 @@ const pipelineReview: Script = async (c) => {
   for (const d of open) byOwner.set(d.owner, (byOwner.get(d.owner) ?? 0) + num(d.value) * num(d.probability) / 100);
   await c.call('create_artifact', {
     kind: 'html', title: 'Pipeline dashboard',
-    content: html('Pipeline bán hàng', `Tính đến ${TODAY} · chỉ tiêu quý ${compact(target)} đ`, `<div class="grid">${kpi('Đã chốt', `${compact(won)} đ`, `${pct(won, target)}% chỉ tiêu`)}${kpi('Pipeline có trọng số', `${compact(weighted)} đ`, `${open.length} cơ hội mở`)}${kpi('Độ phủ', `${coverage}x`, 'trọng số / phần còn thiếu')}${kpi('Có rủi ro', String(atRisk.length), `≥ ${idle} ngày hoặc quá hạn chốt`)}</div><div class="card"><h2>Giá trị theo giai đoạn</h2>${svgBars(bars)}</div><div class="card"><h2>Pipeline có trọng số theo người phụ trách</h2>${tableHtml(['Sales', 'Có trọng số'], [...byOwner.entries()].map(([k, v]) => ({ Sales: k, 'Có trọng số': fmt(v) })))}</div><div class="card"><h2>Cơ hội cần xử lý</h2>${tableHtml(['deal', 'customer', 'owner', 'stage', 'value', 'reason'], tasks.map((t) => ({ ...t, value: fmt(num(t.value)) })))}</div>`),
+    content: html('Pipeline bán hàng', `Tính đến ${c.today} · chỉ tiêu quý ${compact(target)} đ`, `<div class="grid">${kpi('Đã chốt', `${compact(won)} đ`, `${pct(won, target)}% chỉ tiêu`)}${kpi('Pipeline có trọng số', `${compact(weighted)} đ`, `${open.length} cơ hội mở`)}${kpi('Độ phủ', `${coverage}x`, 'trọng số / phần còn thiếu')}${kpi('Có rủi ro', String(atRisk.length), `≥ ${idle} ngày hoặc quá hạn chốt`)}</div><div class="card"><h2>Giá trị theo giai đoạn</h2>${svgBars(bars)}</div><div class="card"><h2>Pipeline có trọng số theo người phụ trách</h2>${tableHtml(['Sales', 'Có trọng số'], [...byOwner.entries()].map(([k, v]) => ({ Sales: k, 'Có trọng số': fmt(v) })))}</div><div class="card"><h2>Cơ hội cần xử lý</h2>${tableHtml(['deal', 'customer', 'owner', 'stage', 'value', 'reason'], tasks.map((t) => ({ ...t, value: fmt(num(t.value)) })))}</div>`),
   });
   await c.call('create_artifact', { kind: 'table', title: 'Follow-up tasks', columns: ['deal', 'customer', 'owner', 'stage', 'value', 'idle_days', 'reason', 'task'], rows: tasks });
   const top = atRisk.slice(0, 3).map((d) => `${d.deal_id} ${d.customer} (${compact(num(d.value))}, ${d.owner})`).join('; ');
@@ -292,20 +295,20 @@ const vocInsights: Script = async (c) => {
   c.say('Nối phàn nàn giao hàng với đơn thật để tìm nguyên nhân.', 'Linking delivery complaints to orders to find the root cause.');
   const lateIds = tagged.filter((t) => t.themes.includes('Giao hàng') && t.order_id).map((t) => t.order_id);
   const lateOrders = lateIds.length ? await all(c, 'orders', { where: [{ field: 'order_id', op: 'in', value: lateIds }] }) : [];
-  const roots = lateOrders.map((o) => ({ order: o.order_id, customer: o.customer_name, carrier: o.carrier, region: o.region, delay_days: o.delivered_date ? daysBetween(o.promised_date, o.delivered_date) : daysBetween(o.promised_date, TODAY) }));
+  const roots = lateOrders.map((o) => ({ order: o.order_id, customer: o.customer_name, carrier: o.carrier, region: o.region, delay_days: o.delivered_date ? daysBetween(o.promised_date, o.delivered_date) : daysBetween(o.promised_date, c.today) }));
   const byCarrier = new Map<string, number>();
   for (const r of roots) byCarrier.set(r.carrier, (byCarrier.get(r.carrier) ?? 0) + 1);
   const worst = [...byCarrier.entries()].sort((a, b) => b[1] - a[1])[0];
   const avgRating = await calc(c, `round((${reviews.map((r) => num(r.rating)).join(' + ')}) / ${reviews.length} * 10) / 10`);
-  await c.call('create_ticket', { subject: `Giao trễ lặp lại: ${worst?.[0] ?? ''} (${worst?.[1] ?? 0} đánh giá xấu)`, priority: 'high', summary: `${roots.length} đánh giá phàn nàn giao trễ, liên kết đơn: ${roots.map((r) => `${r.order} ${r.carrier} trễ ${r.delay_days} ngày`).join('; ')}. Đề xuất: SLA phạt trễ với đơn vị vận chuyển, gọi báo trước khi trễ.`, assignee: 'Trưởng phòng Vận hành', dueDate: addDays(TODAY, 3) });
+  await c.call('create_ticket', { subject: `Giao trễ lặp lại: ${worst?.[0] ?? ''} (${worst?.[1] ?? 0} đánh giá xấu)`, priority: 'high', summary: `${roots.length} đánh giá phàn nàn giao trễ, liên kết đơn: ${roots.map((r) => `${r.order} ${r.carrier} trễ ${r.delay_days} ngày`).join('; ')}. Đề xuất: SLA phạt trễ với đơn vị vận chuyển, gọi báo trước khi trễ.`, assignee: 'Trưởng phòng Vận hành', dueDate: addDays(c.today, 3) });
   const pack = tagged.filter((t) => t.themes.includes('Đóng gói'));
-  await c.call('create_ticket', { subject: `Đóng gói: ${pack.length} phản hồi móp/rách/rò rỉ`, priority: 'normal', summary: pack.map((p) => `${p.review_id} ${p.product}: ${p.text}`).join('\n'), assignee: 'Quản lý kho', dueDate: addDays(TODAY, 5) });
+  await c.call('create_ticket', { subject: `Đóng gói: ${pack.length} phản hồi móp/rách/rò rỉ`, priority: 'normal', summary: pack.map((p) => `${p.review_id} ${p.product}: ${p.text}`).join('\n'), assignee: 'Quản lý kho', dueDate: addDays(c.today, 5) });
   for (const r of tagged.filter((t) => num(t.rating) <= 2)) {
     await c.call('draft_email', { to: `${r.source} – ${r.customer} (phản hồi công khai)`, subject: `Trả lời đánh giá ${r.review_id} (${r.rating}★)`, body: `Cảm ơn ${r.customer === 'Khách lẻ' ? 'anh/chị' : r.customer} đã phản hồi. Chúng tôi xin lỗi về ${r.themes.toLowerCase()}${r.order_id ? ` ở đơn ${r.order_id}` : ''}. Đội ngũ đã ghi nhận và sẽ liên hệ trực tiếp để khắc phục trong hôm nay. Rất mong tiếp tục được phục vụ.` });
   }
   await c.call('create_artifact', {
     kind: 'html', title: 'Voice of customer',
-    content: html('Tiếng nói khách hàng', `${c.inputs.period || 'Tháng 10/2026'} · ${reviews.length} đánh giá · ${tickets.reduce((n, t) => n + num(t.count), 0)} ticket`, `<div class="grid">${kpi('Điểm trung bình', `${avgRating}★`, `${reviews.length} đánh giá`)}${kpi('Tiêu cực', String(tagged.filter((t) => t.sentiment === 'tiêu cực').length), '1–2 sao')}${kpi('Chủ đề lớn nhất', themeStats[0]?.theme ?? '—', `${themeStats[0]?.count ?? 0} lần`)}${kpi('Đơn vị trễ nhiều nhất', worst?.[0] ?? '—', `${worst?.[1] ?? 0} đơn bị phàn nàn`)}</div><div class="card"><h2>Số lần nhắc theo chủ đề</h2>${svgBars(themeStats.map((t) => ({ label: t.theme, value: t.count })))}</div><div class="card"><h2>Điểm theo kênh</h2>${tableHtml(['source', 'avg_rating', 'count'], bySource)}</div><div class="card"><h2>Nguyên nhân gốc: giao trễ</h2>${tableHtml(['order', 'customer', 'carrier', 'region', 'delay_days'], roots)}</div><div class="card"><h2>Sản phẩm điểm thấp</h2>${tableHtml(['product', 'avg_rating', 'count'], byProduct.slice(0, 5))}</div>`),
+    content: html('Tiếng nói khách hàng', `${c.inputs.period || `Tháng ${monthOf(c.today)}`} · ${reviews.length} đánh giá · ${tickets.reduce((n, t) => n + num(t.count), 0)} ticket`, `<div class="grid">${kpi('Điểm trung bình', `${avgRating}★`, `${reviews.length} đánh giá`)}${kpi('Tiêu cực', String(tagged.filter((t) => t.sentiment === 'tiêu cực').length), '1–2 sao')}${kpi('Chủ đề lớn nhất', themeStats[0]?.theme ?? '—', `${themeStats[0]?.count ?? 0} lần`)}${kpi('Đơn vị trễ nhiều nhất', worst?.[0] ?? '—', `${worst?.[1] ?? 0} đơn bị phàn nàn`)}</div><div class="card"><h2>Số lần nhắc theo chủ đề</h2>${svgBars(themeStats.map((t) => ({ label: t.theme, value: t.count })))}</div><div class="card"><h2>Điểm theo kênh</h2>${tableHtml(['source', 'avg_rating', 'count'], bySource)}</div><div class="card"><h2>Nguyên nhân gốc: giao trễ</h2>${tableHtml(['order', 'customer', 'carrier', 'region', 'delay_days'], roots)}</div><div class="card"><h2>Sản phẩm điểm thấp</h2>${tableHtml(['product', 'avg_rating', 'count'], byProduct.slice(0, 5))}</div>`),
   });
   await c.call('create_artifact', { kind: 'table', title: 'Tagged reviews', columns: ['review_id', 'date', 'source', 'customer', 'rating', 'product', 'themes', 'sentiment', 'text'], rows: tagged });
   return T(c.lang,
@@ -345,12 +348,12 @@ const expenseAudit: Script = async (c) => {
   const people = new Map<string, typeof review>();
   for (const r of review.filter((x) => x.issues !== 'OK')) people.set(r.employee, [...(people.get(r.employee) ?? []), r]);
   for (const [emp, rs] of people) {
-    await c.call('draft_email', { to: emp, subject: `Bổ sung đề nghị thanh toán tháng ${c.inputs.month || '10/2026'}`, body: `Chào ${emp},\n\nKế toán đã rà soát đề nghị thanh toán của bạn. Các khoản cần bổ sung/điều chỉnh:\n${rs.map((r) => `- ${r.claim} (${fmt(r.amount)} đ): ${r.issues}. Đang tạm giữ ${fmt(r.on_hold)} đ.`).join('\n')}\n\nCác khoản còn lại sẽ được thanh toán trong kỳ này. Bạn vui lòng bổ sung trước ngày ${addDays(TODAY, 5)}.\n\nCảm ơn,\nPhòng Kế toán` });
+    await c.call('draft_email', { to: emp, subject: `Bổ sung đề nghị thanh toán tháng ${c.inputs.month || monthOf(c.today)}`, body: `Chào ${emp},\n\nKế toán đã rà soát đề nghị thanh toán của bạn. Các khoản cần bổ sung/điều chỉnh:\n${rs.map((r) => `- ${r.claim} (${fmt(r.amount)} đ): ${r.issues}. Đang tạm giữ ${fmt(r.on_hold)} đ.`).join('\n')}\n\nCác khoản còn lại sẽ được thanh toán trong kỳ này. Bạn vui lòng bổ sung trước ngày ${addDays(c.today, 5)}.\n\nCảm ơn,\nPhòng Kế toán` });
   }
   await c.call('create_artifact', { kind: 'table', title: 'Claim review', columns: ['claim', 'employee', 'department', 'category', 'amount', 'issues', 'approvable', 'on_hold', 'note'], rows: review });
   await c.call('create_artifact', {
     kind: 'html', title: 'Expense summary',
-    content: html('Rà soát chi phí', `Tháng ${c.inputs.month || '10/2026'} · ${review.length} đề nghị · kết quả hỗ trợ kế toán duyệt, không phải quyết định cuối`, `<div class="grid">${kpi('Tổng đề nghị', `${fmt(claimed)} đ`, `${review.length} khoản`)}${kpi('Được duyệt', `${fmt(claimed - onHold)} đ`, `${pct(claimed - onHold, claimed)}%`)}${kpi('Tạm giữ', `${fmt(onHold)} đ`, `${review.filter((r) => r.on_hold > 0).length} khoản`)}${kpi('Người cần bổ sung', String(people.size), '')}</div><div class="card"><h2>Theo phòng ban</h2>${tableHtml(['department', 'claimed', 'count'], byDept.map((d) => ({ ...d, claimed: fmt(num(d.claimed)) })))}</div><div class="card"><h2>Ngoại lệ</h2>${tableHtml(['claim', 'employee', 'issues', 'on_hold'], review.filter((r) => r.issues !== 'OK').map((r) => ({ ...r, on_hold: fmt(r.on_hold) })))}</div>`),
+    content: html('Rà soát chi phí', `Tháng ${c.inputs.month || monthOf(c.today)} · ${review.length} đề nghị · kết quả hỗ trợ kế toán duyệt, không phải quyết định cuối`, `<div class="grid">${kpi('Tổng đề nghị', `${fmt(claimed)} đ`, `${review.length} khoản`)}${kpi('Được duyệt', `${fmt(claimed - onHold)} đ`, `${pct(claimed - onHold, claimed)}%`)}${kpi('Tạm giữ', `${fmt(onHold)} đ`, `${review.filter((r) => r.on_hold > 0).length} khoản`)}${kpi('Người cần bổ sung', String(people.size), '')}</div><div class="card"><h2>Theo phòng ban</h2>${tableHtml(['department', 'claimed', 'count'], byDept.map((d) => ({ ...d, claimed: fmt(num(d.claimed)) })))}</div><div class="card"><h2>Ngoại lệ</h2>${tableHtml(['claim', 'employee', 'issues', 'on_hold'], review.filter((r) => r.issues !== 'OK').map((r) => ({ ...r, on_hold: fmt(r.on_hold) })))}</div>`),
   });
   return T(c.lang,
     `Tổng đề nghị **${fmt(claimed)} đ**, đủ điều kiện duyệt **${fmt(claimed - onHold)} đ**, tạm giữ **${fmt(onHold)} đ** ở ${review.filter((r) => r.on_hold > 0).length} khoản: ${review.filter((r) => r.issues !== 'OK').map((r) => `${r.claim} (${r.issues.split(';')[0]})`).join(', ')}. Đã soạn email cho ${people.size} người cần bổ sung. Kế toán chỉ cần quyết các ngoại lệ, đặc biệt khoản vượt định mức tiếp khách và khách sạn cần trưởng phòng xác nhận.`,
@@ -361,9 +364,10 @@ const expenseAudit: Script = async (c) => {
 const supplierCompare: Script = async (c) => {
   const need = c.inputs.need ?? '';
   const text = (c.attachmentText || c.inputs.quotes || '').trim();
-  const qtyNeed = num(/(\d[\d.]*)\s*(bao|thung|thùng|chai)/i.exec(need)?.[1]);
+  const qtyNeed = num((/,\s*(\d[\d.]*)\s+\S/.exec(need) ?? /(\d[\d.]*)\s*(bao|thung|thùng|chai)/i.exec(need))?.[1]);
   const deadlineM = /(\d{1,2})\/(\d{1,2})/.exec(need);
-  const deadline = deadlineM ? `2026-${deadlineM[2].padStart(2, '0')}-${deadlineM[1].padStart(2, '0')}` : addDays(TODAY, 10);
+  const year = Number(c.today.slice(0, 4)) + (deadlineM && Number(deadlineM[2]) < Number(c.today.slice(5, 7)) ? 1 : 0);
+  const deadline = deadlineM ? `${year}-${deadlineM[2].padStart(2, '0')}-${deadlineM[1].padStart(2, '0')}` : addDays(c.today, 10);
   c.say('Trích điều khoản từng báo giá.', 'Extracting the terms of each quote.');
   const quotes = text.split(/\r?\n/).filter((l) => /đơn giá|price/i.test(l)).map((l) => {
     const name = (/^(?:NCC\s*\d+\s*[–-]\s*)?([^:]+):/.exec(l)?.[1] ?? l.slice(0, 30)).trim();
@@ -381,13 +385,13 @@ const supplierCompare: Script = async (c) => {
   const available = num(inv?.on_hand) - num(inv?.reserved);
   const daily = num(inv?.avg_daily_sales) || 1;
   const cover = Math.round((available / daily) * 10) / 10;
-  const stockout = addDays(TODAY, Math.floor(cover));
+  const stockout = addDays(c.today, Math.floor(cover));
   c.say('Quy về tổng chi phí và kiểm tra kịp hàng.', 'Computing landed cost and timing against stock.');
   const rows: Record<string, string | number>[] = [];
   for (const q of quotes) {
     const qty = Math.max(qtyNeed, q.moq);
     const total = await calc(c, `${qty} * ${q.price} + ${q.freight}`);
-    const arrival = addDays(TODAY, q.lead);
+    const arrival = addDays(c.today, q.lead);
     rows.push({ supplier: q.name, unit_price: q.price, moq: q.moq, order_qty: qty, freight: q.freight, total_cost: total, cost_per_needed_unit: Math.round(total / Math.max(1, qtyNeed)), lead_days: q.lead, arrival, on_time: arrival <= deadline ? 'yes' : 'no', payment: q.prepay ? 'trả trước' : `${q.payDays} ngày` });
   }
   const minCost = Math.min(...rows.map((r) => num(r.total_cost)));
@@ -399,7 +403,7 @@ const supplierCompare: Script = async (c) => {
   const best = rows[0], second = rows[1];
   await c.call('create_artifact', { kind: 'table', title: 'Supplier comparison', columns: ['supplier', 'unit_price', 'moq', 'order_qty', 'freight', 'total_cost', 'cost_per_needed_unit', 'lead_days', 'arrival', 'on_time', 'payment', 'score'], rows });
   await c.call('create_artifact', { kind: 'markdown', title: 'Recommendation', content: `# Đề xuất mua ${p?.product ?? need}\n\n**Nhu cầu:** ${fmt(qtyNeed)} ${p?.unit ?? ''}, về kho trước ${deadline}.\n\n**Tồn kho hiện tại:** ${fmt(available)} khả dụng, bán ${daily}/ngày → còn **${cover} ngày**, dự kiến hết hàng ${stockout}.\n\n## Chọn: ${best?.supplier}\n- Tổng chi phí ${fmt(num(best?.total_cost))} đ, về ${best?.arrival}, thanh toán ${best?.payment}, điểm ${best?.score}/100.\n- So với phương án sau (${second?.supplier}): chênh ${fmt(num(best?.total_cost) - num(second?.total_cost))} đ, đổi lại ${num(best?.lead_days) < num(second?.lead_days) ? `về sớm hơn ${num(second?.lead_days) - num(best?.lead_days)} ngày` : 'điều khoản tốt hơn'}.\n\n## Rủi ro\n- Hàng hết từ ${stockout} trong khi lô sớm nhất về ${rows.map((r) => String(r.arrival)).sort()[0]}: cần giữ hàng cho khách lớn hoặc mua gấp lô nhỏ.\n${rows.filter((r) => r.on_time === 'no').map((r) => `- ${r.supplier} không kịp hạn ${deadline}.`).join('\n')}\n\n*Cách chấm: chi phí 50%, đúng hạn 30%, điều khoản thanh toán 20%.*` });
-  await c.call('draft_email', { to: String(best?.supplier), subject: `Đơn đặt hàng ${p?.product ?? ''} – ${fmt(num(best?.order_qty))} ${p?.unit ?? ''}`, body: `Kính gửi ${best?.supplier},\n\nViệt Minh Distribution xác nhận đặt ${fmt(num(best?.order_qty))} ${p?.unit ?? ''} ${p?.product ?? ''}, đơn giá ${fmt(num(best?.unit_price))} đ, phí vận chuyển ${fmt(num(best?.freight))} đ, tổng ${fmt(num(best?.total_cost))} đ, thanh toán ${best?.payment}. Đề nghị giao tại kho Bình Dương trước ${best?.arrival}.\n\nVui lòng xác nhận lại lịch giao.\n\nTrân trọng,\nPhòng Mua hàng` });
+  await c.call('draft_email', { to: String(best?.supplier), subject: `Đơn đặt hàng ${p?.product ?? ''} – ${fmt(num(best?.order_qty))} ${p?.unit ?? ''}`, body: `Kính gửi ${best?.supplier},\n\n${c.company} xác nhận đặt ${fmt(num(best?.order_qty))} ${p?.unit ?? ''} ${p?.product ?? ''}, đơn giá ${fmt(num(best?.unit_price))} đ, phí vận chuyển ${fmt(num(best?.freight))} đ, tổng ${fmt(num(best?.total_cost))} đ, thanh toán ${best?.payment}. Đề nghị giao tại kho Bình Dương trước ${best?.arrival}.\n\nVui lòng xác nhận lại lịch giao.\n\nTrân trọng,\nPhòng Mua hàng` });
   return T(c.lang,
     `Đề xuất **${best?.supplier}**: ${fmt(num(best?.total_cost))} đ, về ${best?.arrival}, thanh toán ${best?.payment} (điểm ${best?.score}/100). Phương án dự phòng: ${second?.supplier} (${fmt(num(second?.total_cost))} đ). ${rows.filter((r) => r.on_time === 'no').map((r) => `${r.supplier} rẻ trên đơn giá nhưng không kịp hạn và buộc mua ${fmt(num(r.order_qty))} ${p?.unit ?? ''}`).join('; ')}. **Rủi ro:** tồn kho chỉ còn ${cover} ngày (hết ${stockout}), sớm hơn mọi lô hàng. Email đặt hàng đã soạn.`,
     `Recommend **${best?.supplier}**: ${fmt(num(best?.total_cost))} VND, arrives ${best?.arrival}, payment ${best?.payment} (score ${best?.score}/100). Fallback: ${second?.supplier} (${fmt(num(second?.total_cost))}). ${rows.filter((r) => r.on_time === 'no').map((r) => `${r.supplier} is cheaper per unit but late and forces ${fmt(num(r.order_qty))} units`).join('; ')}. **Risk:** only ${cover} days of stock left (out on ${stockout}), before any delivery. PO email drafted.`);
@@ -427,7 +431,7 @@ const monthlyDeck: Script = async (c) => {
   const deals = await all(c, 'deals');
   const weighted = deals.filter((d) => !['won', 'lost'].includes(d.stage)).reduce((n, d) => n + num(d.value) * num(d.probability) / 100, 0);
   const slides: string[] = [
-    `<section class="s title"><p class="eyebrow">Việt Minh Distribution</p><h1>${L('Họp giao ban', 'Monthly business review')}</h1><p class="big">${esc(c.inputs.month || 'Tháng 10/2026')}</p></section>`,
+    `<section class="s title"><p class="eyebrow">${c.company}</p><h1>${L('Họp giao ban', 'Monthly business review')}</h1><p class="big">${esc(c.inputs.month || `Tháng ${monthOf(c.today)}`)}</p></section>`,
     `<section class="s"><p class="eyebrow">${L('Tóm tắt', 'Headline')}</p><h2>${L(`Doanh thu ${compact(revenue)} đ, giao đúng hẹn ${onTime}%, nợ quá hạn ${compact(overdue)} đ`, `Revenue ${compact(revenue)} VND, ${onTime}% on time, ${compact(overdue)} overdue`)}</h2><div class="grid">${kpi(L('Doanh thu', 'Revenue'), `${compact(revenue)} đ`, `${orders.length} ${L('đơn', 'orders')}`)}${kpi(L('Giao đúng hẹn', 'On-time'), `${onTime}%`, `${late.length} ${L('đơn trễ', 'late')}`)}${kpi(L('Quá hạn', 'Overdue'), `${pct(overdue, bal)}%`, `${compact(overdue)} đ`)}${kpi(L('Điểm khách hàng', 'Customer rating'), `${num(ratings[0]?.avg)}★`, `${ratings[0]?.count ?? 0} ${L('đánh giá', 'reviews')}`)}</div></section>`,
     `<section class="s"><p class="eyebrow">${L('Doanh thu', 'Revenue')}</p><h2>${L(`${byRegion[0]?.region} dẫn đầu với ${pct(num(byRegion[0]?.revenue), revenue)}% doanh thu`, `${byRegion[0]?.region} leads with ${pct(num(byRegion[0]?.revenue), revenue)}% of revenue`)}</h2>${svgBars(byRegion.map((r) => ({ label: String(r.region), value: num(r.revenue) })), 640, 220)}</section>`,
     `<section class="s"><p class="eyebrow">${L('Giao hàng', 'Delivery')}</p><h2>${L(`${late.length} đơn giao trễ; cần SLA với đơn vị vận chuyển`, `${late.length} late orders; carrier SLA needed`)}</h2>${tableHtml([L('Đơn', 'Order'), L('Khách hàng', 'Customer'), L('Vận chuyển', 'Carrier'), L('Trễ (ngày)', 'Days late')], late.map((o) => ({ [L('Đơn', 'Order')]: o.order_id, [L('Khách hàng', 'Customer')]: o.customer_name, [L('Vận chuyển', 'Carrier')]: o.carrier, [L('Trễ (ngày)', 'Days late')]: daysBetween(o.promised_date, o.delivered_date) })))}</section>`,
@@ -453,8 +457,8 @@ function addWorkdays(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 const onboarding: Script = async (c) => {
-  const { name = '', role = '', department = '', start = addDays(TODAY, 10), manager = '' } = c.inputs;
-  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : addDays(TODAY, 10);
+  const { name = '', role = '', department = '', start = addDays(c.today, 10), manager = '' } = c.inputs;
+  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : addDays(c.today, 10);
   c.say('Đọc quy trình tiếp nhận và quy định bảo mật.', 'Reading the onboarding procedure and security rules.');
   const proc = (await c.call('search_knowledge', { query: 'nhân viên mới IT tài khoản laptop hợp đồng thử việc hồ sơ', limit: 6 })).data as { results?: { passage: string }[] };
   await c.call('search_knowledge', { query: 'bảo mật thông tin tài khoản', limit: 2 });
@@ -464,7 +468,7 @@ const onboarding: Script = async (c) => {
   const it = (await c.call('create_ticket', { subject: `IT: chuẩn bị cho ${name} (${role})`, priority: 'normal', summary: `Tạo email công ty, tài khoản HRM và CRM${/cskh|cham soc/.test(fold(department + role)) ? ', Zalo OA và helpdesk' : ''}; cấp laptop; cài phần mềm theo phòng ${department}. Ngày bắt đầu ${startDate}.`, assignee: 'IT', dueDate: tMinus3 })).data as { ticketId?: string };
   const ad = (await c.call('create_ticket', { subject: `Hành chính: thẻ & chỗ ngồi cho ${name}`, priority: 'normal', summary: `Thẻ ra vào, chỗ ngồi khu ${department}, đồng phục (nếu có).`, assignee: 'Hành chính', dueDate: tMinus3 })).data as { ticketId?: string };
   const hr = (await c.call('create_ticket', { subject: `Nhân sự: hợp đồng thử việc ${name}`, priority: 'normal', summary: `Gửi hợp đồng thử việc ${probation} ngày; thu CCCD, sổ BHXH, bằng cấp, tài khoản ngân hàng; lịch hướng dẫn 9:00 ngày ${startDate}; nhắc đăng ký BHXH trong 30 ngày sau hợp đồng chính thức.`, assignee: 'Nhân sự', dueDate: tMinus3 })).data as { ticketId?: string };
-  await c.call('draft_email', { to: `${name} (email cá nhân)`, subject: `Chào mừng ${name} gia nhập Việt Minh Distribution`, body: `Chào ${name},\n\nChúc mừng bạn gia nhập đội ${department} ở vị trí ${role}. Ngày làm việc đầu tiên: ${startDate}, 8:45 tại văn phòng.\n\nNgày đầu:\n- 9:00 Phòng Nhân sự hướng dẫn nội quy, bảo mật thông tin, an toàn\n- 11:00 Gặp quản lý ${manager} và người hướng dẫn\n- Chiều: nhận laptop, tài khoản email/HRM/CRM\n\nVui lòng mang: CCCD, sổ BHXH (nếu có), bản sao bằng cấp, thông tin tài khoản ngân hàng.\n\nHẹn gặp bạn!\nPhòng Nhân sự` });
+  await c.call('draft_email', { to: `${name} (email cá nhân)`, subject: `Chào mừng ${name} gia nhập ${c.company}`, body: `Chào ${name},\n\nChúc mừng bạn gia nhập đội ${department} ở vị trí ${role}. Ngày làm việc đầu tiên: ${startDate}, 8:45 tại văn phòng.\n\nNgày đầu:\n- 9:00 Phòng Nhân sự hướng dẫn nội quy, bảo mật thông tin, an toàn\n- 11:00 Gặp quản lý ${manager} và người hướng dẫn\n- Chiều: nhận laptop, tài khoản email/HRM/CRM\n\nVui lòng mang: CCCD, sổ BHXH (nếu có), bản sao bằng cấp, thông tin tài khoản ngân hàng.\n\nHẹn gặp bạn!\nPhòng Nhân sự` });
   await c.call('draft_email', { to: manager || 'Quản lý trực tiếp', subject: `Chuẩn bị đón ${name} ngày ${startDate}`, body: `Chào anh/chị,\n\n${name} (${role}) bắt đầu ngày ${startDate}. Nhờ anh/chị trước ${tMinus3}:\n1. Chọn người hướng dẫn (buddy) trong nhóm.\n2. Gửi 3 việc cụ thể cho tuần đầu.\n3. Đặt lịch đánh giá 30 ngày (${addDays(startDate, 30)}) và đánh giá cuối thử việc (${addDays(startDate, probation)}).\n\nTicket đã mở: IT ${it.ticketId}, Hành chính ${ad.ticketId}, Nhân sự ${hr.ticketId}.\n\nCảm ơn,\nPhòng Nhân sự` });
   const checklist = [
     { task: 'Tài khoản email, HRM, CRM + laptop', owner: 'IT', due: tMinus3, ref: it.ticketId },
@@ -516,7 +520,7 @@ const aiReadiness: Script = async (c) => {
   const deptRows = deptAll.map((d) => ({ department: d.department, staff: d.staff, users: num(deptUsers.find((u) => u.department === d.department)?.users), adoption: pct(num(deptUsers.find((u) => u.department === d.department)?.users), num(d.staff)), risky: num(deptRisk.find((u) => u.department === d.department)?.risky), hours_week: d.hours }));
   await c.call('create_artifact', {
     kind: 'html', title: 'AI readiness scorecard',
-    content: html('Bảng điểm sẵn sàng AI', `Việt Minh Distribution · ${total} người trả lời khảo sát · ${TODAY}`, `<div class="grid">${kpi('Điểm tổng', `${overall}/5`, '5 trụ cột')}${kpi('Dùng AI', `${adoption}%`, `${personalPct}% bằng tài khoản cá nhân`)}${kpi('Rủi ro dữ liệu', `${riskyPct}%`, `${risky} người`)}${kpi('Giờ có thể tiết kiệm', `${fmt(saved)} h/tháng`, `${hours} h lặp lại/tuần × ${Math.round(share * 100)}%`)}</div><div class="card"><h2>5 trụ cột</h2>${tableHtml(['pillar', 'score', 'why'], pillars.map((p) => ({ ...p, score: `${'●'.repeat(p.score)}${'○'.repeat(5 - p.score)} ${p.score}` })))}</div><div class="card"><h2>Tỷ lệ dùng AI theo phòng ban (%)</h2>${svgBars(deptRows.map((d) => ({ label: String(d.department), value: d.adoption })))}</div><div class="card"><h2>Rủi ro & cơ hội theo phòng ban</h2>${tableHtml(['department', 'staff', 'users', 'adoption', 'risky', 'hours_week'], deptRows)}</div><p class="sub">Luật Trí tuệ nhân tạo (hiệu lực 01/03/2026) và Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026) là bối cảnh pháp lý; đây không phải tư vấn pháp lý.</p>`),
+    content: html('Bảng điểm sẵn sàng AI', `${c.company} · ${total} người trả lời khảo sát · ${c.today}`, `<div class="grid">${kpi('Điểm tổng', `${overall}/5`, '5 trụ cột')}${kpi('Dùng AI', `${adoption}%`, `${personalPct}% bằng tài khoản cá nhân`)}${kpi('Rủi ro dữ liệu', `${riskyPct}%`, `${risky} người`)}${kpi('Giờ có thể tiết kiệm', `${fmt(saved)} h/tháng`, `${hours} h lặp lại/tuần × ${Math.round(share * 100)}%`)}</div><div class="card"><h2>5 trụ cột</h2>${tableHtml(['pillar', 'score', 'why'], pillars.map((p) => ({ ...p, score: `${'●'.repeat(p.score)}${'○'.repeat(5 - p.score)} ${p.score}` })))}</div><div class="card"><h2>Tỷ lệ dùng AI theo phòng ban (%)</h2>${svgBars(deptRows.map((d) => ({ label: String(d.department), value: d.adoption })))}</div><div class="card"><h2>Rủi ro & cơ hội theo phòng ban</h2>${tableHtml(['department', 'staff', 'users', 'adoption', 'risky', 'hours_week'], deptRows)}</div><p class="sub">Luật Trí tuệ nhân tạo (hiệu lực 01/03/2026) và Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026) là bối cảnh pháp lý; đây không phải tư vấn pháp lý.</p>`),
   });
   await c.call('create_artifact', { kind: 'markdown', title: '90-day roadmap', content: `# Lộ trình 90 ngày\n\n**Mục tiêu:** ${c.inputs.goal || '—'}\n\n## Tuần 1–2: an toàn trước\n- Ban hành quy định sử dụng AI và danh sách công cụ được phép (dùng agent "Soạn quy định sử dụng AI").\n- Chuyển ${personal} người đang dùng tài khoản cá nhân sang tài khoản công ty; ưu tiên ${deptRows.filter((d) => d.risky > 0).sort((a, b) => b.risky - a.risky).slice(0, 2).map((d) => d.department).join(' và ')} (rủi ro dữ liệu cao nhất).\n\n## Tuần 3–6: đào tạo trên việc thật\n- Workshop theo phòng ban, mỗi phòng 3 việc lặp lại nhất (${deptRows.sort((a, b) => num(b.hours_week) - num(a.hours_week)).slice(0, 3).map((d) => `${d.department} ${d.hours_week} h/tuần`).join(', ')}).\n- Mục tiêu: ≥ 80% được đào tạo (hiện ${trainedPct}%).\n\n## Tuần 4–12: xây công cụ kết nối hệ thống\n- Agent CSKH (tra đơn, ticket), đối soát ngân hàng, báo giá, báo cáo tuần.\n- Kết nối dữ liệu qua MCP/CSV với CRM, phần mềm kế toán.\n\n## Ngày 90: đo lường\n- So sánh tỷ lệ dùng AI, giờ tiết kiệm, số người dùng tài khoản cá nhân với khảo sát này.` });
   const weakest = [...pillars].sort((a, b) => a.score - b.score)[0];
@@ -544,7 +548,7 @@ const aiPolicy: Script = async (c) => {
   });
   for (const p of planned) if (!decisions.some((d) => fold(String(d.tool)).includes(fold(p).split(' ')[0]))) decisions.push({ tool: p, used_by: 'dự kiến', account_today: '—', decision: 'approve (tài khoản công ty)', reason: 'Công ty dự kiến cấp phép' });
   const policy = `# QUY ĐỊNH SỬ DỤNG TRÍ TUỆ NHÂN TẠO (AI) – DỰ THẢO
-*Việt Minh Distribution · Bản nháp do AI soạn ngày ${TODAY} · **Cần luật sư rà soát trước khi ban hành***
+*${c.company} · Bản nháp do AI soạn ngày ${c.today} · **Cần luật sư rà soát trước khi ban hành***
 
 ## 1. Mục đích
 Giúp nhân viên dùng AI để làm việc nhanh hơn, đồng thời bảo vệ dữ liệu khách hàng, dữ liệu cá nhân và bí mật kinh doanh, phù hợp Luật Trí tuệ nhân tạo (Luật số 134/2025, hiệu lực 01/03/2026) và Luật Bảo vệ dữ liệu cá nhân (Luật số 91/2025, hiệu lực 01/01/2026).
@@ -663,7 +667,7 @@ const policyHelpdesk: Script = async (c) => {
   if (topic && !(res.results ?? []).length) res = (await c.call('search_knowledge', { query: topic[1], limit: 3 })).data as Hits;
   const hits = topic ? (res.results ?? []).slice(0, 2) : [];
   if (!hits.length) {
-    const tk = (await c.call('create_ticket', { subject: `Câu hỏi chưa có trong tài liệu: ${question.slice(0, 80)}`, priority: 'normal', summary: question, assignee: 'HR', dueDate: addDays(TODAY, 2) })).data as { ticketId?: string };
+    const tk = (await c.call('create_ticket', { subject: `Câu hỏi chưa có trong tài liệu: ${question.slice(0, 80)}`, priority: 'normal', summary: question, assignee: 'HR', dueDate: addDays(c.today, 2) })).data as { ticketId?: string };
     return T(c.lang, `Tài liệu nội bộ hiện **chưa có** quy định về nội dung này, nên tôi không trả lời để tránh sai. Tôi đã chuyển câu hỏi cho phòng Nhân sự (ticket **${tk.ticketId}**); bạn sẽ nhận phản hồi trong 2 ngày làm việc.`, `The internal documents **do not cover** this yet, so I will not guess. I forwarded your question to HR (ticket **${tk.ticketId}**); expect an answer within 2 working days.`);
   }
   const ai = /chatgpt|\bai\b|tai khoan ca nhan|gemini/.test(f);

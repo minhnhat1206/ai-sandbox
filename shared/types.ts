@@ -157,6 +157,8 @@ export interface Workspace {
   createdAt: string;
   updatedAt: string;
   expiresAt?: string;
+  /** "Today" of the connected (synthetic) data, yyyy-mm-dd. Demo data: 2026-10-28. */
+  dataAsOf?: string;
 }
 
 export interface WorkflowOverride {
@@ -273,6 +275,121 @@ export interface Lead {
   sessionId: string;
   createdAt: string;
 }
+
+/* --------------------------------------------------------------- data studio */
+
+/** Vocabulary of one industry: everything the synthetic-data generator needs to sound like the prospect. */
+export interface IndustryProfile {
+  /** Preset key (e.g. "packaging") or "custom" when proposed by the AI. */
+  key: string;
+  /** Industry label shown in the admin, e.g. "Sản xuất bao bì nhựa". */
+  label: string;
+  /** Customer segments (3-4). Each becomes a price column in price_list. */
+  segments: string[];
+  customers: { name: string; segment: string; city: string; contact: string }[];
+  products: { name: string; category: string; unit: string; price: number; supplier: string }[];
+  /** Delivery methods / carriers used in orders. */
+  carriers: string[];
+  /** Prospects not yet customers (pipeline). */
+  prospects: { name: string; segment: string }[];
+  /** Typical quantity per order line [min, max]. */
+  qtyRange: [number, number];
+  departments: string[];
+}
+
+export type ColumnKind = 'id' | 'text' | 'person' | 'customer' | 'product' | 'enum' | 'integer' | 'money' | 'percent' | 'date' | 'email' | 'phone' | 'boolean';
+
+/** A table in the prospect's own structure (from pasted headers, a template file or a screenshot). */
+export interface ExtraTableSpec {
+  name: string;
+  description: string;
+  rows: number;
+  columns: { name: string; label: string; kind: ColumnKind; values?: string[]; min?: number; max?: number }[];
+}
+
+/** What the data studio proposes before generating anything; the founder reviews and edits it. */
+export interface DataBlueprint {
+  company: string;
+  industry: string;
+  /** "Today" in the synthetic data (yyyy-mm-dd). */
+  asOf: string;
+  profile: IndustryProfile;
+  extraTables: ExtraTableSpec[];
+  /** Catalog workflows that fit this company, in demo order. */
+  workflowIds: string[];
+  /** Assumptions and warnings for the founder to check. */
+  notes: string[];
+  source: 'ai' | 'heuristic';
+}
+
+/** Preview of what generation produced (nothing is saved until the founder applies it). */
+export interface GeneratedData {
+  dataSources: { name: string; description: string; csv: string; rows: number; columns: string[] }[];
+  knowledge: { title: string; content: string }[];
+  /** Sample inputs adapted to the generated data, keyed by workflow id. */
+  samples: Record<string, Record<string, string>>;
+  asOf: string;
+}
+
+/* ------------------------------------------------------------------ reports */
+
+/** One workflow the decision maker tried, summarised for the report. */
+export interface ReportHighlight {
+  workflowId: string;
+  name: L;
+  runs: number;
+  minutesSaved: number;
+  avgRating: number | null;
+  /** One or two sentences: what the agent did on their data. */
+  headline: string;
+  /** Titles of deliverables the agent produced. */
+  deliverables: string[];
+  /** Simulated actions (tickets, email drafts) the agent prepared. */
+  actions: string[];
+}
+
+/** The paid next step proposed in the report (AI Kickstart by default). */
+export interface ReportOffer {
+  title: string;
+  price: string;
+  duration: string;
+  audience: string;
+  agenda: string[];
+  includes: string[];
+}
+
+export type ReportStatus = 'draft' | 'published';
+
+/** Report for the decision maker after the free trial. Written in one language. */
+export interface Report {
+  id: string;
+  /** Random share token used in /r/:token. */
+  token: string;
+  workspaceId: string;
+  lang: Lang;
+  status: ReportStatus;
+  title: string;
+  preparedFor: string;
+  /** Short narrative (Markdown) opening the report. */
+  summary: string;
+  /** What the agents found in the (synthetic) company data. */
+  findings: string[];
+  metrics: { runs: number; workflowsTried: number; minutesSaved: number; avgRating: number | null; ratings: number; deliverables: number; actions: number; people: number };
+  highlights: ReportHighlight[];
+  offer: ReportOffer;
+  /** Markdown: what happens after they say yes. */
+  nextSteps: string;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+  views: number;
+  firstViewedAt?: string;
+  lastViewedAt?: string;
+  acceptedAt?: string;
+}
+
+/** What the public report page receives. */
+export type PublicReport = Omit<Report, 'workspaceId' | 'views' | 'firstViewedAt' | 'lastViewedAt'> & { company: string };
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

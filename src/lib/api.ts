@@ -1,4 +1,4 @@
-import type { AdminOverview, ChatMessage, Lang, Lead, LeadType, Run, RunEvent, SandboxView, WorkflowDef, Workspace } from '@shared/types';
+import type { AdminOverview, ChatMessage, DataBlueprint, GeneratedData, Lang, Lead, LeadType, PublicReport, Report, Run, RunEvent, SandboxView, WorkflowDef, Workspace } from '@shared/types';
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly code?: string) {
@@ -102,6 +102,13 @@ export async function uploadFile(token: string, file: File): Promise<{ id: strin
   return body.upload;
 }
 
+// ---- report for the decision maker --------------------------------------------------------
+export const reportApi = {
+  get: (token: string, preview = false) => request<{ report: PublicReport }>(`/api/report/${encodeURIComponent(token)}${preview ? '?preview' : ''}`),
+  accept: (token: string, data: { name: string; email: string; message: string }) =>
+    request<{ ok: true }>(`/api/report/${encodeURIComponent(token)}/accept`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ---- admin -------------------------------------------------------------------------------
 const ADMIN_KEY = 'sandbox.adminToken';
 export function getAdminToken(): string {
@@ -114,7 +121,7 @@ export function setAdminToken(token: string): void {
   } catch { /* ignore */ }
 }
 
-export type WorkspaceWithStats = Workspace & { stats: { runs: number; leads: number } };
+export type WorkspaceWithStats = Workspace & { stats: { runs: number; leads: number; report: { id: string; status: Report['status']; views: number; accepted: boolean } | null } };
 
 export const adminApi = {
   login: (token: string) => request<{ ok: true; adminTokenIsDefault: boolean }>('/api/admin/login', { method: 'POST', body: '{}' }, token),
@@ -129,5 +136,23 @@ export const adminApi = {
   runs: (id: string) => request<{ runs: Run[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}/runs`, {}, getAdminToken()),
   leads: (id: string) => request<{ leads: Lead[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}/leads`, {}, getAdminToken()),
   draftWorkflow: (brief: string, lang: Lang) => request<{ workflow: unknown; problems: string[]; error?: string }>('/api/admin/ai/draft-workflow', { method: 'POST', body: JSON.stringify({ brief, lang }) }, getAdminToken()),
+  uploadFile: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/admin/uploads', { method: 'POST', body: form, headers: { authorization: `Bearer ${getAdminToken()}` } });
+    const body = (await res.json().catch(() => ({}))) as { error?: string; upload?: { id: string; name: string; mime: string; size: number; hasText: boolean } };
+    if (!res.ok || !body.upload) throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
+    return body.upload;
+  },
+  presets: () => request<{ presets: { key: string; label: string }[] }>('/api/admin/datagen/presets', {}, getAdminToken()),
+  proposeBlueprint: (data: { company: string; industry: string; notes: string; headers: string; presetKey?: string; uploadIds?: string[]; asOf?: string }) =>
+    request<{ blueprint: DataBlueprint }>('/api/admin/datagen/blueprint', { method: 'POST', body: JSON.stringify(data) }, getAdminToken()),
+  previewData: (blueprint: DataBlueprint) => request<{ blueprint: DataBlueprint; data: GeneratedData }>('/api/admin/datagen/preview', { method: 'POST', body: JSON.stringify({ blueprint }) }, getAdminToken()),
+  applyData: (id: string, blueprint: DataBlueprint, mode: 'replace' | 'merge', setWorkflows: boolean) =>
+    request<{ workspace: Workspace; resolved: WorkflowDef[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}/datagen/apply`, { method: 'POST', body: JSON.stringify({ blueprint, mode, setWorkflows }) }, getAdminToken()),
+  reports: (id: string) => request<{ reports: Report[] }>(`/api/admin/workspaces/${encodeURIComponent(id)}/reports`, {}, getAdminToken()),
+  createReport: (id: string, lang: Lang) => request<{ report: Report }>(`/api/admin/workspaces/${encodeURIComponent(id)}/reports`, { method: 'POST', body: JSON.stringify({ lang }) }, getAdminToken()),
+  updateReport: (id: string, data: Record<string, unknown>) => request<{ report: Report }>(`/api/admin/reports/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }, getAdminToken()),
+  deleteReport: (id: string) => request<{ ok: true }>(`/api/admin/reports/${encodeURIComponent(id)}`, { method: 'DELETE' }, getAdminToken()),
   health: () => request<{ ok: true; provider: { name: string; model: string; isDemo: boolean }; adminTokenIsDefault: boolean }>('/api/health'),
 };

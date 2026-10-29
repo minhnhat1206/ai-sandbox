@@ -9,8 +9,10 @@ import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { adminApi } from '@/lib/api';
 import { Markdown } from '@/lib/markdown';
+import { DataStudio } from './DataStudio';
+import { ReportsTab } from './ReportsTab';
 
-type Tab = 'general' | 'workflows' | 'knowledge' | 'data' | 'connectors' | 'custom' | 'activity';
+type Tab = 'general' | 'workflows' | 'knowledge' | 'data' | 'connectors' | 'custom' | 'activity' | 'report';
 const STATUS_TONE = { draft: 'neutral', active: 'success', converted: 'brand', archived: 'warn' } as const;
 
 export default function WorkspaceEditor() {
@@ -56,6 +58,7 @@ export default function WorkspaceEditor() {
     { id: 'connectors', label: t('ad_tab_connectors'), icon: 'Globe', count: ws.mcpServers?.length ?? 0 },
     { id: 'custom', label: t('ad_tab_custom'), icon: 'Wand2', count: ws.customWorkflows.length },
     { id: 'activity', label: t('ad_tab_activity'), icon: 'bolt' },
+    { id: 'report', label: t('ad_tab_report'), icon: 'FileText' },
   ];
 
   return (
@@ -78,13 +81,19 @@ export default function WorkspaceEditor() {
       </div>
 
       <div className="animate-fade" key={tab}>
-        {tab === 'general' && <GeneralTab ws={ws} onSave={save} saving={saving} />}
+        {tab === 'general' && <GeneralTab key={ws.token} ws={ws} onSave={save} saving={saving} />}
         {tab === 'workflows' && <WorkflowsTab ws={ws} catalog={catalog} onSave={save} />}
-        {tab === 'knowledge' && <KnowledgeTab ws={ws} onSave={save} saving={saving} />}
-        {tab === 'data' && <DataTab ws={ws} onSave={save} saving={saving} />}
+        {tab === 'knowledge' && <KnowledgeTab key={ws.updatedAt} ws={ws} onSave={save} saving={saving} />}
+        {tab === 'data' && (
+          <div className="space-y-4">
+            <DataStudio ws={ws} onApplied={(next) => { setWs(next); setSavedAt(Date.now()); }} />
+            <DataTab key={ws.updatedAt} ws={ws} onSave={save} saving={saving} />
+          </div>
+        )}
         {tab === 'connectors' && <ConnectorsTab ws={ws} onSave={save} saving={saving} />}
         {tab === 'custom' && <CustomTab ws={ws} onSave={save} lang={lang} />}
         {tab === 'activity' && <ActivityTab ws={ws} pick={pick} />}
+        {tab === 'report' && <ReportsTab ws={ws} />}
       </div>
     </div>
   );
@@ -136,7 +145,12 @@ function GeneralTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<
         <Field label={t('ad_ws_industry')} htmlFor="g-i"><Input id="g-i" value={f.industry} onChange={(e) => set('industry', e.target.value)} /></Field>
         <Field label={t('ad_ws_contact')} htmlFor="g-cn"><Input id="g-cn" value={f.contactName} onChange={(e) => set('contactName', e.target.value)} /></Field>
         <Field label={t('ad_ws_email')} htmlFor="g-ce"><Input id="g-ce" value={f.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} /></Field>
-        <Field label={t('ad_ws_token')} htmlFor="g-t"><Input id="g-t" value={f.token} onChange={(e) => set('token', e.target.value)} className="font-mono" /></Field>
+        <Field label={t('ad_ws_token')} htmlFor="g-t" help={t('ad_ws_token_help')}>
+          <div className="flex gap-2">
+            <Input id="g-t" value={f.token} onChange={(e) => set('token', e.target.value)} className="font-mono" />
+            <Button type="button" size="sm" variant="secondary" icon="rotate" className="h-10 shrink-0" onClick={() => onSave({ regenerateToken: true })} title={t('ad_ws_regen_help')}>{t('ad_ws_regen')}</Button>
+          </div>
+        </Field>
         <Field label={t('ad_ws_status')} htmlFor="g-s">
           <Select id="g-s" value={f.status} onChange={(e) => set('status', e.target.value as WorkspaceStatus)}>
             <option value="draft">{t('ad_status_draft')}</option><option value="active">{t('ad_status_active')}</option><option value="converted">{t('ad_status_converted')}</option><option value="archived">{t('ad_status_archived')}</option>
@@ -147,7 +161,7 @@ function GeneralTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<
           <Field label={t('ad_ws_credits')} htmlFor="g-cr"><Input id="g-cr" type="number" min={0} value={f.total} onChange={(e) => set('total', Number(e.target.value))} /></Field>
           <Field label="Used" htmlFor="g-cu"><Input id="g-cu" type="number" min={0} value={f.used} onChange={(e) => set('used', Number(e.target.value))} /></Field>
         </div>
-        <Field label="Expires (optional)" htmlFor="g-ex"><Input id="g-ex" type="date" value={f.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} /></Field>
+        <Field label={t('ad_ws_expires')} htmlFor="g-ex" help={t('ad_ws_expires_help')}><Input id="g-ex" type="date" value={f.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} /></Field>
         <div className="sm:col-span-2 rounded-xl bg-sand-2 p-4">
           <div className="flex flex-wrap items-end gap-4">
             <Field label={t('ad_ws_budget')} htmlFor="g-bu" help={t('ad_ws_budget_hint')}>

@@ -8,6 +8,9 @@ export interface ScriptCtx {
   inputs: Record<string, string>;
   lang: Lang;
   attachmentText: string;
+  /** "Today" of the sandbox data (yyyy-mm-dd) and the company name, so narration fits any sandbox. */
+  today: string;
+  company: string;
   say: (vi: string, en: string) => void;
   call: (tool: string, input: unknown) => Promise<{ ok: boolean; data: unknown; raw: string }>;
 }
@@ -47,6 +50,13 @@ export const daysBetween = (a: string, b: string) => Math.round((new Date(b).get
 /** Lower-case, strip Vietnamese diacritics and punctuation – for fuzzy matching names. */
 export const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 /** The demo "today" – all sample data is dated relative to 28/10/2026. */
-export const TODAY = '2026-10-28';
+/** "Today" of the demo data set (server/seed-data.ts). Generated sandboxes carry their own date. */
+export const DEMO_TODAY = '2026-10-28';
+/** 28/10/2026 */
+export const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+/** 10/2026 */
+export const monthOf = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+/** Price-list column for a customer segment ("Modern trade" → modern_trade). */
+export const segCol = (segment: string | undefined) => (segment ? fold(segment).replace(/ /g, '_') : 'list_price');
 export const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 export const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);

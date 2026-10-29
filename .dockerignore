@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+e2e/screenshots
+reports
+.env
+.env.*
+.git

@@ -42,7 +42,15 @@
 | 3. Báo cáo cho sếp | 2–3 | Trang báo cáo chia sẻ được + đề xuất Kickstart | Gửi được cho 3 khách đầu |
 | 4. Chế độ lớp học | 3–6 | Phiên học, QR, bài tập + AI chấm, chat tự do, bảng theo dõi, đo trước – sau, ngân sách phiên | Chạy thử 1 buổi nội bộ với 5–10 người |
 
-## 5. Giả định cần kiểm chứng
+## 5. Tiến độ (cập nhật 29/10/2026)
+| Giai đoạn | Trạng thái | Đã có | Việc còn lại của founder |
+|---|---|---|---|
+| 1. Sẵn sàng chạy thật | **Xong phần code** | Mã mời ngẫu nhiên (link cũ thu hồi được), hết hạn mặc định 30 ngày, giới hạn tần suất theo IP và theo sandbox, khoá đăng nhập admin sau 10 lần sai, server production từ chối mật khẩu yếu, sao lưu hằng ngày, `docs/DEPLOY.md` (Docker/systemd + Caddy HTTPS), `npm run real-check` | Gắn `ANTHROPIC_API_KEY`, chạy `npm run real-check`, thuê VPS + tên miền |
+| 2. Xưởng dữ liệu giả lập | **Xong** | Admin → Dữ liệu kết nối → "Tạo dữ liệu theo ngành": ghi chú + tiêu đề cột + ảnh/file mẫu → AI (hoặc bộ mẫu 9 ngành) đề xuất → sửa → xem trước → áp dụng. 11 bảng khớp chéo, 6 tài liệu, dữ liệu mẫu của 11 quy trình tự trỏ vào dữ liệu mới; mọi agent chạy được trên mọi ngành (có test) | Thử với 1–2 người quen thật, đo thời gian dựng |
+| 3. Báo cáo cho sếp | **Xong** | Admin → "Báo cáo cho sếp": tạo từ lượt chạy thật, sửa lời văn và giá Kickstart, xuất bản link `/r/…`, đếm lượt xem, nút "Đặt lịch buổi Kickstart" tạo lead; in/lưu PDF | Chốt giá Kickstart và tên công ty |
+| 4. Chế độ lớp học | Chưa làm | | |
+
+## 6. Giả định cần kiểm chứng
 - Người quen sẵn sàng dành 30 phút thử sandbox và chuyển báo cáo lên cấp trên.
 - Dữ liệu giả lập "giống công ty mình" đủ thuyết phục, không cần dữ liệu thật.
 - Kickstart có sandbox thực hành bán được ở mức giá Zone C/B (250–450 USD) và tạo ≥ 25% chuyển đổi sang gói lớn hơn.

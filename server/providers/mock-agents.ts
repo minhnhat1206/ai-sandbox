@@ -5,7 +5,7 @@
  */
 import { parseCsv, toCsv, toNumber } from '../../shared/engine/csv.ts';
 import type { AgentHooks, AgentRequest } from './types.ts';
-import { compact, esc, fmt, html, kpi, rowsOf, svgBars, T, tableHtml, type Script, type ScriptCtx } from './mock-kit.ts';
+import { addDays, compact, DEMO_TODAY, dmy, esc, fmt, html, kpi, rowsOf, svgBars, T, tableHtml, type Script, type ScriptCtx } from './mock-kit.ts';
 import { EXTRA_SCRIPTS } from './mock-agents-extra.ts';
 
 /* ------------------------------------------------------------------ scripts */
@@ -23,7 +23,7 @@ const orderCare: Script = async (c) => {
   c.say('Đối chiếu chính sách giao trễ và bồi thường.', 'Checking the late-delivery and compensation policy.');
   const policy = (await c.call('search_knowledge', { query: 'hoàn tiền giao trễ voucher', limit: 3 })).data as { results?: { title: string; passage: string }[] };
   const promised = new Date(order.promised_date);
-  const today = new Date('2026-10-28');
+  const today = new Date(c.today);
   const daysLate = Math.max(0, Math.round((today.getTime() - promised.getTime()) / 86400000));
   const amount = toNumber(order.amount) ?? 0;
   const calc = (await c.call('calculate', { expression: `round(${amount} * 0.02)` })).data as { value?: number };
@@ -33,7 +33,7 @@ const orderCare: Script = async (c) => {
   const ticket = (await c.call('create_ticket', {
     customer: order.customer_name, subject: `Đơn ${orderId} trễ ${daysLate} ngày – ${order.status}`, priority: daysLate >= 5 ? 'urgent' : 'high',
     summary: `Khách ${order.customer_name} báo chưa nhận đơn ${orderId} (${order.product}, ${order.qty} x ${fmt(toNumber(order.unit_price) ?? 0)} = ${fmt(amount)} đ). Hẹn giao ${order.promised_date}, trạng thái hệ thống: ${order.status}, vận chuyển: ${order.carrier}. Cần xác nhận vị trí hàng với ${order.carrier} trong 2 giờ và gọi lại khách. Hotline không nghe máy: kiểm tra lịch trực.`,
-    assignee: 'Trưởng ca giao nhận', dueDate: '2026-10-28 17:00',
+    assignee: 'Trưởng ca giao nhận', dueDate: `${c.today} 17:00`,
   })).data as { ticketId?: string };
   const name = customer?.contact ?? order.customer_name;
   const body = `Kính gửi ${name},\n\nChúng tôi thành thật xin lỗi vì đơn hàng #${orderId} (${order.product}, ${order.qty} đơn vị) chưa đến đúng hẹn ${order.promised_date} và vì anh/chị chưa liên lạc được với hotline. Đây không phải trải nghiệm chúng tôi muốn mang lại.\n\nHệ thống ghi nhận đơn đang ở trạng thái "${order.status}" với đơn vị vận chuyển ${order.carrier}. Chúng tôi đã mở ticket ưu tiên ${ticket.ticketId ?? ''} và sẽ gọi lại anh/chị trước 17:00 hôm nay với giờ giao chính xác.\n\n${refundEligible ? 'Theo chính sách, đơn giao trễ quá 5 ngày làm việc được hoàn tiền 100% nếu anh/chị chọn huỷ. ' : ''}Nếu anh/chị tiếp tục nhận hàng, chúng tôi gửi tặng voucher ${fmt(goodwill)} đ cho đơn tiếp theo như lời xin lỗi.\n\nAnh/chị vui lòng trả lời tin nhắn này để chúng tôi xử lý theo lựa chọn của mình.\n\nTrân trọng,\nBộ phận Chăm sóc khách hàng`;
@@ -48,7 +48,7 @@ const orderCare: Script = async (c) => {
 | Khách hàng | ${order.customer_name} (${customer?.segment ?? '—'}, phụ trách: ${customer?.account_manager ?? '—'}) |
 | Sản phẩm | ${order.product} × ${order.qty} = ${fmt(amount)} đ |
 | Hẹn giao / trạng thái | ${order.promised_date} / **${order.status}** (${order.carrier}) |
-| Số ngày trễ tính đến 28/10 | **${daysLate}** |
+| Số ngày trễ tính đến ${dmy(c.today).slice(0, 5)} | **${daysLate}** |
 | Công nợ mở | ${invoices.length} hoá đơn, trong đó ${overdue.length} quá hạn (${fmt(overdue.reduce((n, i) => n + (toNumber(i.balance) ?? 0), 0))} đ) |
 
 ## Chính sách áp dụng
@@ -90,7 +90,7 @@ const receivables: Script = async (c) => {
   const callList = overdueRows.map((r) => ({ customer: r.customer_name, invoice: r.invoice_id, balance: toNumber(r.balance) ?? 0, days_overdue: toNumber(r.days_overdue) ?? 0, account_manager: r.account_manager, action: (toNumber(r.days_overdue) ?? 0) > 45 ? 'Gọi + tạm dừng giao hàng' : (toNumber(r.days_overdue) ?? 0) > 30 ? 'Gọi trực tiếp hôm nay' : 'Email nhắc + gọi trong tuần' }));
   await c.call('create_artifact', {
     kind: 'html', title: 'Receivables dashboard',
-    content: html('Dashboard công nợ phải thu', 'Tính đến 28/10/2026 · nguồn: receivables', `<div class="grid">${kpi('Tổng số dư', `${compact(totalBal)} đ`, `${total.count} hoá đơn`)}${kpi('Quá hạn', `${compact(overdueBal)} đ`, `${share.value ?? 0}% tổng số dư`)}${kpi('Khách có số dư', String(byCustomer.length), `${callList.length} hoá đơn ≥ ${threshold} ngày`)}${kpi('Nợ > 60 ngày', `${compact(bucketRows[4].value)} đ`, `${bucketRows[4].count} hoá đơn`)}</div><div class="card"><h2>Số dư theo tuổi nợ (ngày)</h2>${svgBars(bucketRows.map((b) => ({ label: b.label, value: b.value })))}</div><div class="card"><h2>Khách hàng quá hạn nhiều nhất</h2>${tableHtml(['Khách hàng', 'Số dư', 'Quá hạn (ngày)', 'Phụ trách', 'Việc cần làm'], callList.slice(0, 10).map((r) => ({ 'Khách hàng': r.customer, 'Số dư': fmt(r.balance), 'Quá hạn (ngày)': r.days_overdue, 'Phụ trách': r.account_manager, 'Việc cần làm': r.action })))}</div>`),
+    content: html('Dashboard công nợ phải thu', `Tính đến ${dmy(c.today)} · nguồn: receivables`, `<div class="grid">${kpi('Tổng số dư', `${compact(totalBal)} đ`, `${total.count} hoá đơn`)}${kpi('Quá hạn', `${compact(overdueBal)} đ`, `${share.value ?? 0}% tổng số dư`)}${kpi('Khách có số dư', String(byCustomer.length), `${callList.length} hoá đơn ≥ ${threshold} ngày`)}${kpi('Nợ > 60 ngày', `${compact(bucketRows[4].value)} đ`, `${bucketRows[4].count} hoá đơn`)}</div><div class="card"><h2>Số dư theo tuổi nợ (ngày)</h2>${svgBars(bucketRows.map((b) => ({ label: b.label, value: b.value })))}</div><div class="card"><h2>Khách hàng quá hạn nhiều nhất</h2>${tableHtml(['Khách hàng', 'Số dư', 'Quá hạn (ngày)', 'Phụ trách', 'Việc cần làm'], callList.slice(0, 10).map((r) => ({ 'Khách hàng': r.customer, 'Số dư': fmt(r.balance), 'Quá hạn (ngày)': r.days_overdue, 'Phụ trách': r.account_manager, 'Việc cần làm': r.action })))}</div>`),
   });
   await c.call('create_artifact', { kind: 'table', title: 'Call list', columns: ['customer', 'invoice', 'balance', 'days_overdue', 'account_manager', 'action'], rows: callList });
   const firm = c.inputs.tone !== 'soft';
@@ -118,23 +118,23 @@ const weeklyOps: Script = async (c) => {
   const orders = rowsOf((await c.call('query_records', { source: 'orders', limit: 50 })).data);
   const byRegion = rowsOf((await c.call('aggregate_records', { source: 'orders', groupBy: 'region', metrics: [{ field: 'amount', fn: 'sum', as: 'revenue' }, { fn: 'count' }], sort: { field: 'revenue', dir: 'desc' } })).data);
   const byCat = rowsOf((await c.call('aggregate_records', { source: 'tickets', groupBy: 'category', metrics: [{ fn: 'count' }, { field: 'resolution_hours', fn: 'avg', as: 'avg_hours' }], sort: { field: 'count', dir: 'desc' } })).data);
-  const period = orders.filter((o) => o.order_date >= '2026-10-20');
+  const period = orders.filter((o) => o.order_date >= addDays(c.today, -8));
   const delivered = orders.filter((o) => o.delivered_date);
   const late = delivered.filter((o) => o.delivered_date > o.promised_date);
   const onTime = (await c.call('calculate', { expression: `round((${delivered.length - late.length}) / ${Math.max(1, delivered.length)} * 1000) / 10` })).data as { value?: number };
   const revPeriod = period.reduce((n, o) => n + (toNumber(o.amount) ?? 0), 0);
   const revMonth = orders.reduce((n, o) => n + (toNumber(o.amount) ?? 0), 0);
-  const stuck = orders.filter((o) => ['delayed', 'in_transit'].includes(o.status) && o.promised_date < '2026-10-28');
+  const stuck = orders.filter((o) => ['delayed', 'in_transit'].includes(o.status) && o.promised_date < c.today);
   const lateRows = [...late, ...stuck].map((o) => ({ 'Đơn': o.order_id, 'Khách hàng': o.customer_name, 'Hẹn giao': o.promised_date, 'Giao thực tế': o.delivered_date || `(${o.status})`, 'Vận chuyển': o.carrier, 'Giá trị': fmt(toNumber(o.amount) ?? 0) }));
   const byCarrier = new Map<string, { n: number; late: number }>();
   for (const o of delivered) { const e = byCarrier.get(o.carrier) ?? { n: 0, late: 0 }; e.n++; if (o.delivered_date > o.promised_date) e.late++; byCarrier.set(o.carrier, e); }
   c.say('Dựng dashboard, viết báo cáo và email.', 'Building the dashboard, the report and the email.');
   await c.call('create_artifact', {
     kind: 'html', title: 'Weekly ops dashboard',
-    content: html('Dashboard vận hành tuần', `${c.inputs.period || 'Tuần 20–28/10/2026'} · nguồn: orders, tickets`, `<div class="grid">${kpi('Doanh thu kỳ', `${compact(revPeriod)} đ`, `${period.length} đơn`)}${kpi('Doanh thu tháng 10', `${compact(revMonth)} đ`, `${orders.length} đơn`)}${kpi('Giao đúng hẹn', `${onTime.value ?? 0}%`, `${late.length} đơn trễ / ${delivered.length} đã giao`)}${kpi('Đơn đang kẹt', String(stuck.length), 'quá hẹn, chưa giao')}</div><div class="card"><h2>Doanh thu theo khu vực (tháng 10)</h2>${svgBars(byRegion.map((r) => ({ label: String(r.region), value: toNumber(r.revenue) ?? 0 })))}</div><div class="card"><h2>Tỷ lệ trễ theo đơn vị vận chuyển</h2>${tableHtml(['Đơn vị', 'Đơn đã giao', 'Trễ', 'Tỷ lệ trễ'], [...byCarrier.entries()].map(([k, v]) => ({ 'Đơn vị': k, 'Đơn đã giao': v.n, 'Trễ': v.late, 'Tỷ lệ trễ': `${Math.round((v.late / v.n) * 100)}%` })))}</div><div class="card"><h2>Đơn trễ và đang kẹt</h2>${tableHtml(['Đơn', 'Khách hàng', 'Hẹn giao', 'Giao thực tế', 'Vận chuyển', 'Giá trị'], lateRows)}</div><div class="card"><h2>Ticket theo loại</h2>${tableHtml(['Loại', 'Số ticket', 'Giờ xử lý TB'], byCat.map((r) => ({ 'Loại': r.category, 'Số ticket': r.count, 'Giờ xử lý TB': r.avg_hours })))}</div>`),
+    content: html('Dashboard vận hành tuần', `${c.inputs.period || `Tuần ${dmy(addDays(c.today, -8)).slice(0, 5)}–${dmy(c.today)}`} · nguồn: orders, tickets`, `<div class="grid">${kpi('Doanh thu kỳ', `${compact(revPeriod)} đ`, `${period.length} đơn`)}${kpi('Doanh thu tháng 10', `${compact(revMonth)} đ`, `${orders.length} đơn`)}${kpi('Giao đúng hẹn', `${onTime.value ?? 0}%`, `${late.length} đơn trễ / ${delivered.length} đã giao`)}${kpi('Đơn đang kẹt', String(stuck.length), 'quá hẹn, chưa giao')}</div><div class="card"><h2>Doanh thu theo khu vực (tháng 10)</h2>${svgBars(byRegion.map((r) => ({ label: String(r.region), value: toNumber(r.revenue) ?? 0 })))}</div><div class="card"><h2>Tỷ lệ trễ theo đơn vị vận chuyển</h2>${tableHtml(['Đơn vị', 'Đơn đã giao', 'Trễ', 'Tỷ lệ trễ'], [...byCarrier.entries()].map(([k, v]) => ({ 'Đơn vị': k, 'Đơn đã giao': v.n, 'Trễ': v.late, 'Tỷ lệ trễ': `${Math.round((v.late / v.n) * 100)}%` })))}</div><div class="card"><h2>Đơn trễ và đang kẹt</h2>${tableHtml(['Đơn', 'Khách hàng', 'Hẹn giao', 'Giao thực tế', 'Vận chuyển', 'Giá trị'], lateRows)}</div><div class="card"><h2>Ticket theo loại</h2>${tableHtml(['Loại', 'Số ticket', 'Giờ xử lý TB'], byCat.map((r) => ({ 'Loại': r.category, 'Số ticket': r.count, 'Giờ xử lý TB': r.avg_hours })))}</div>`),
   });
   const worstCarrier = [...byCarrier.entries()].sort((a, b) => b[1].late / b[1].n - a[1].late / a[1].n)[0];
-  const report = `# Báo cáo vận hành tuần ${c.inputs.period || '20–28/10/2026'}
+  const report = `# Báo cáo vận hành tuần ${c.inputs.period || `${dmy(addDays(c.today, -8)).slice(0, 5)}–${dmy(c.today)}`}
 
 ## Tóm tắt
 Doanh thu kỳ **${fmt(revPeriod)} đ** (${period.length} đơn), luỹ kế tháng ${fmt(revMonth)} đ. Tỷ lệ giao đúng hẹn **${onTime.value ?? 0}%**, ${stuck.length} đơn đang kẹt quá hẹn. Khiếu nại nhiều nhất: **${byCat[0]?.category ?? '—'}** (${byCat[0]?.count ?? 0} ticket).
@@ -155,10 +155,10 @@ ${byRegion.map((r) => `- ${r.region}: ${fmt(toNumber(r.revenue) ?? 0)} đ (${r.c
 - Giải phóng ${stuck.length} đơn kẹt trước thứ Ba; gọi lại các khách liên quan.
 - Kiểm kê tồn kho; họp với đơn vị vận chuyển mới.`;
   await c.call('create_artifact', { kind: 'markdown', title: 'Weekly report', content: report });
-  await c.call('draft_email', { to: 'Giám đốc điều hành', subject: `Báo cáo vận hành tuần ${c.inputs.period || '20–28/10'}: giao đúng hẹn ${onTime.value ?? 0}%`, body: `Kính gửi anh/chị,\n\nTuần này doanh thu ${fmt(revPeriod)} đ (${period.length} đơn), giao đúng hẹn ${onTime.value ?? 0}%, ${stuck.length} đơn đang kẹt quá hẹn. Vấn đề lớn nhất là giao trễ của ${worstCarrier?.[0] ?? 'đơn vị vận chuyển'} và khiếu nại "${byCat[0]?.category ?? ''}".\n\nEm đề xuất 2 quyết định: thuê thêm 1 xe cho tuyến tỉnh từ thứ Năm và chốt SLA phạt trễ với đơn vị vận chuyển. Chi tiết và số liệu trong dashboard đính kèm.\n\nTrân trọng,\nPhòng Vận hành` });
+  await c.call('draft_email', { to: 'Giám đốc điều hành', subject: `Báo cáo vận hành tuần ${c.inputs.period || `${dmy(addDays(c.today, -8)).slice(0, 5)}–${dmy(c.today).slice(0, 5)}`}: giao đúng hẹn ${onTime.value ?? 0}%`, body: `Kính gửi anh/chị,\n\nTuần này doanh thu ${fmt(revPeriod)} đ (${period.length} đơn), giao đúng hẹn ${onTime.value ?? 0}%, ${stuck.length} đơn đang kẹt quá hẹn. Vấn đề lớn nhất là giao trễ của ${worstCarrier?.[0] ?? 'đơn vị vận chuyển'} và khiếu nại "${byCat[0]?.category ?? ''}".\n\nEm đề xuất 2 quyết định: thuê thêm 1 xe cho tuyến tỉnh từ thứ Năm và chốt SLA phạt trễ với đơn vị vận chuyển. Chi tiết và số liệu trong dashboard đính kèm.\n\nTrân trọng,\nPhòng Vận hành` });
   return T(c.lang,
-    `Tuần ${c.inputs.period || '20–28/10'}: doanh thu **${fmt(revPeriod)} đ** (${period.length} đơn), giao đúng hẹn **${onTime.value ?? 0}%**, ${stuck.length} đơn đang kẹt quá hẹn. Điểm nóng: ${worstCarrier?.[0] ?? '—'} trễ ${worstCarrier ? `${worstCarrier[1].late}/${worstCarrier[1].n}` : ''} đơn và ${byCat[0]?.count ?? 0} ticket "${byCat[0]?.category ?? ''}". Dashboard, báo cáo đầy đủ và email gửi sếp đã sẵn sàng bên dưới.`,
-    `Week ${c.inputs.period || '20–28/10'}: revenue **${fmt(revPeriod)} VND** (${period.length} orders), on-time **${onTime.value ?? 0}%**, ${stuck.length} orders stuck past promise. Hotspots: ${worstCarrier?.[0] ?? '—'} late on ${worstCarrier ? `${worstCarrier[1].late}/${worstCarrier[1].n}` : ''} orders and ${byCat[0]?.count ?? 0} "${byCat[0]?.category ?? ''}" tickets. Dashboard, full report and the email to leadership are ready below.`);
+    `Tuần ${c.inputs.period || `${dmy(addDays(c.today, -8)).slice(0, 5)}–${dmy(c.today).slice(0, 5)}`}: doanh thu **${fmt(revPeriod)} đ** (${period.length} đơn), giao đúng hẹn **${onTime.value ?? 0}%**, ${stuck.length} đơn đang kẹt quá hẹn. Điểm nóng: ${worstCarrier?.[0] ?? '—'} trễ ${worstCarrier ? `${worstCarrier[1].late}/${worstCarrier[1].n}` : ''} đơn và ${byCat[0]?.count ?? 0} ticket "${byCat[0]?.category ?? ''}". Dashboard, báo cáo đầy đủ và email gửi sếp đã sẵn sàng bên dưới.`,
+    `Week ${c.inputs.period || `${dmy(addDays(c.today, -8)).slice(0, 5)}–${dmy(c.today).slice(0, 5)}`}: revenue **${fmt(revPeriod)} VND** (${period.length} orders), on-time **${onTime.value ?? 0}%**, ${stuck.length} orders stuck past promise. Hotspots: ${worstCarrier?.[0] ?? '—'} late on ${worstCarrier ? `${worstCarrier[1].late}/${worstCarrier[1].n}` : ''} orders and ${byCat[0]?.count ?? 0} "${byCat[0]?.category ?? ''}" tickets. Dashboard, full report and the email to leadership are ready below.`);
 };
 
 const inventory: Script = async (c) => {
@@ -203,7 +203,7 @@ const meetingPrep: Script = async (c) => {
   const recv = rowsOf((await c.call('query_records', { source: 'receivables', where: [{ field: 'customer_name', op: 'eq', value: cname }, { field: 'balance', op: 'gt', value: 0 }], sort: { field: 'days_overdue', dir: 'desc' } })).data);
   const tickets = rowsOf((await c.call('query_records', { source: 'tickets', where: [{ field: 'customer_name', op: 'eq', value: cname }] })).data);
   c.say('Tìm tin tức công khai và điều khoản nội bộ.', 'Searching public news and internal terms.');
-  await c.call('web_search', { query: `${cname} tin tức 2026` });
+  await c.call('web_search', { query: `${cname} tin tức ${c.today.slice(0, 4)}` });
   const terms = (await c.call('search_knowledge', { query: 'công nợ hạn mức chiết khấu', limit: 2 })).data as { results?: { title: string; passage: string }[] };
   const late = orders.filter((o) => o.delivered_date && o.delivered_date > o.promised_date);
   const overdue = recv.reduce((n, r) => n + (toNumber(r.balance) ?? 0), 0);
@@ -351,6 +351,8 @@ export async function runMockAgent(req: AgentRequest, hooks: AgentHooks, delayMs
     inputs: req.meta.inputs,
     lang: req.meta.lang,
     attachmentText: (req.attachments ?? []).map((a) => a.text ?? '').join('\n\n'),
+    today: req.meta.asOf ?? DEMO_TODAY,
+    company: req.meta.company ?? 'Việt Minh Distribution',
     say: (vi, en) => { void stream(`${T(req.meta.lang, vi, en)}\n\n`); },
     call: async (tool, input) => {
       const id = `mock_${++seq}`;

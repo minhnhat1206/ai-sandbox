@@ -122,11 +122,44 @@ describe('admin API', () => {
     expect((await app.request('/api/admin/overview', { headers: auth })).status).toBe(200);
   });
 
+  it('rejects short custom link codes and can regenerate the link', async () => {
+    const created = await json(await app.request('/api/admin/workspaces', { method: 'POST', headers: auth, body: JSON.stringify({ company: 'ABC', token: 'abc' }) }));
+    const ws = created.workspace as Workspace;
+    expect(ws.token).toMatch(/^abc-[a-z0-9]{8}$/);
+    const weak = await app.request(`/api/admin/workspaces/${ws.id}`, { method: 'PUT', headers: auth, body: JSON.stringify({ token: 'abc' }) });
+    expect(weak.status).toBe(400);
+    const regen = await json(await app.request(`/api/admin/workspaces/${ws.id}`, { method: 'PUT', headers: auth, body: JSON.stringify({ regenerateToken: true }) }));
+    expect(regen.workspace.token).not.toBe(ws.token);
+    expect(regen.workspace.token).toMatch(/^abc-[a-z0-9]{8}$/);
+  });
+
+  it('locks out an IP after repeated failed admin sign-ins', async () => {
+    const env = { incoming: { socket: { remoteAddress: '203.0.113.9' } } };
+    for (let i = 0; i < 10; i++) expect((await app.request('/api/admin/overview', { headers: { authorization: 'Bearer nope' } }, env)).status).toBe(401);
+    const locked = await app.request('/api/admin/overview', { headers: auth }, env);
+    expect(locked.status).toBe(429);
+    // Another address is unaffected.
+    expect((await app.request('/api/admin/overview', { headers: auth }, { incoming: { socket: { remoteAddress: '198.51.100.1' } } })).status).toBe(200);
+  });
+
+  it('rate-limits runs per IP and sends the referrer policy', async () => {
+    const env = { incoming: { socket: { remoteAddress: '203.0.113.20' } } };
+    const view = await app.request('/api/sandbox/demo', {}, env);
+    expect(view.headers.get('referrer-policy')).toBe('no-referrer');
+    let last = 0;
+    for (let i = 0; i < 21; i++) {
+      const res = await app.request('/api/sandbox/demo/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workflowId: 'nope' }) }, env);
+      last = res.status;
+    }
+    expect(last).toBe(429);
+  });
+
   it('creates, updates and deletes a workspace with a unique token', async () => {
     const created = await app.request('/api/admin/workspaces', { method: 'POST', headers: auth, body: JSON.stringify({ company: 'Công ty Thử Nghiệm', industry: 'Retail', credits: 20, workflowIds: ['quote-builder-agent', 'bogus'] }) });
     expect(created.status).toBe(201);
     const ws = (await json(created)).workspace as Workspace;
-    expect(ws.token).toBe('cong-ty-thu-nghiem');
+    expect(ws.token).toMatch(/^cong-ty-thu-nghiem-[a-z0-9]{8}$/);
+    expect(ws.expiresAt).toBeTruthy();
     expect(ws.workflowIds).toEqual(['quote-builder-agent']);
     expect(ws.credits.total).toBe(20);
 

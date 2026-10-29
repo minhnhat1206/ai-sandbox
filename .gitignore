@@ -10,3 +10,5 @@ e2e/screenshots
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+data/backups
+reports/

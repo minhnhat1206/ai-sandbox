@@ -18,3 +18,9 @@
   about people (hiring, credit, medical) without an explicit human-review step.
 - The model output is rendered through our own Markdown renderer, which never injects
   HTML. Do not replace it with `dangerouslySetInnerHTML`.
+- Invite links (`/s/<token>`) and report links (`/r/<token>`) are bearer secrets: random,
+  never logged, never put in third-party URLs (`Referrer-Policy: no-referrer` is set).
+  Public routes are rate-limited (`server/ratelimit.ts`); keep new public routes behind it.
+- Sandboxes run on synthetic data (`server/datagen`) until the prospect signs. Generated
+  names must stay fictional: no real companies, brands or people in presets.
+- Reports (`server/report.ts`) show hours saved and findings, never USD or tokens.

@@ -17,7 +17,7 @@ export function apiPlugin(): Plugin {
       const { UploadStore } = await import('./uploads.ts');
       loadDotEnv();
       const config = readConfig();
-      const store = new Store(config.dataDir);
+      const store = new Store(config.dataDir, { backupDays: config.backupDays });
       const provider = createProvider(config);
       const app = createApp({ store, provider, config, uploads: new UploadStore(`${config.dataDir}/uploads`), filesDir: `${config.dataDir}/artifacts` });
       const listener = getRequestListener(app.fetch);

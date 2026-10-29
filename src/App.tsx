@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Landing from './pages/Landing';
+import ReportPage from './pages/ReportPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminLogin from './pages/admin/AdminLogin';
 import Catalog from './pages/admin/Catalog';
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="results" element={<MyResults />} />
         <Route path="contact" element={<Contact />} />
       </Route>
+      <Route path="/r/:token" element={<ReportPage />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />

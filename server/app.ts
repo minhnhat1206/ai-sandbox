@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Context } from 'hono';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CATALOG } from '../shared/catalog/index.ts';
@@ -13,7 +14,10 @@ import type { AdminOverview, Artifact, ChatMessage, DataSource, Lang, Lead, Lead
 import type { Config } from './config.ts';
 import { nowIso, shortId, slugify } from './ids.ts';
 import type { Provider } from './providers/types.ts';
+import { clientIp, RateLimiter } from './ratelimit.ts';
 import { ProviderError } from './providers/types.ts';
+import { applyGeneratedData, generateData, normalizeBlueprint, PRESET_KEYS, proposeBlueprint } from './datagen/index.ts';
+import { applyReportEdits, buildReport, publicReport } from './report.ts';
 import { RunError, runChat, runWorkflow } from './runner.ts';
 import type { Store } from './store.ts';
 import type { UploadStore } from './uploads.ts';
@@ -37,6 +41,23 @@ const LANGS = new Set<Lang>(['vi', 'en']);
 const asLang = (v: unknown, fallback: Lang): Lang => (typeof v === 'string' && LANGS.has(v as Lang) ? (v as Lang) : fallback);
 const str = (v: unknown, max = 2000): string => (typeof v === 'string' ? v.slice(0, max) : '');
 const providerInfo = (p: Provider) => ({ name: p.name, model: p.model, isDemo: p.isDemo });
+
+/** Invite links must not be guessable: a readable prefix plus 8 random characters (~40 bits). */
+export const newInviteToken = (company: string) => `${slugify(company).slice(0, 20).replace(/-+$/, '')}-${shortId(8)}`;
+const MIN_CUSTOM_TOKEN = 12;
+
+const digest = (s: string) => createHash('sha256').update(s).digest();
+const sameSecret = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
+
+/** Requests per window. Generous for a real prospect, tight for a script. */
+const LIMITS = {
+  sandbox: { limit: 240, windowMs: 60_000 },
+  runPerIp: { limit: 20, windowMs: 60_000 },
+  runPerToken: { limit: 60, windowMs: 10 * 60_000 },
+  upload: { limit: 30, windowMs: 10 * 60_000 },
+  lead: { limit: 10, windowMs: 10 * 60_000 },
+  adminFail: { limit: 10, windowMs: 15 * 60_000 },
+} as const;
 
 function publicView(ws: Workspace, provider: Provider): SandboxView {
   return {
@@ -85,10 +106,28 @@ export function createApp(deps: AppDeps): Hono {
     return { id, kind: 'file', title: safe, filename: safe, mime: file.mime, size: file.bytes.length };
   };
   const app = new Hono();
+  const limiter = new RateLimiter();
+
+  /** 429 with a Retry-After header when the key is over its limit. */
+  const limited = (c: Context, key: string, rule: { limit: number; windowMs: number }) => {
+    if (!config.rateLimit) return null;
+    const wait = limiter.take(key, rule.limit, rule.windowMs);
+    if (!wait) return null;
+    c.header('retry-after', String(wait));
+    return c.json({ error: 'Too many requests, please wait a moment', code: 'rate_limited', retryAfter: wait }, 429);
+  };
 
   app.onError((err, c) => {
     console.error('[api]', err);
     return c.json({ error: 'Internal error' }, 500);
+  });
+
+  // Invite tokens live in URLs: never leak them to third parties through the Referer header.
+  app.use('/api/*', async (c, next) => {
+    await next();
+    c.header('referrer-policy', 'no-referrer');
+    c.header('x-content-type-options', 'nosniff');
+    if (!c.res.headers.get('cache-control')) c.header('cache-control', 'no-store');
   });
 
   app.get('/api/health', (c) =>
@@ -99,6 +138,15 @@ export function createApp(deps: AppDeps): Hono {
   // Public sandbox routes (no account needed; the invite token is the key)
   // =====================================================================
   const sandbox = new Hono<Env>();
+
+  sandbox.use('*', async (c, next) => {
+    const ip = clientIp(c, config.trustProxy);
+    if (ip) {
+      const blocked = limited(c, `ip:${ip}`, LIMITS.sandbox);
+      if (blocked) return blocked;
+    }
+    await next();
+  });
 
   sandbox.use('/:token/*', async (c, next) => {
     const ws = store.getWorkspaceByToken(c.req.param('token'));
@@ -125,6 +173,9 @@ export function createApp(deps: AppDeps): Hono {
   /** Shared streaming handler for runs and chat turns. */
   async function streamRun(c: Context<Env>, kind: 'form' | 'chat') {
     const ws = c.get('workspace');
+    const ip = clientIp(c, config.trustProxy);
+    const blocked = (ip ? limited(c, `run-ip:${ip}`, LIMITS.runPerIp) : null) ?? limited(c, `run-ws:${ws.id}`, LIMITS.runPerToken);
+    if (blocked) return blocked;
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const wf = resolveWorkflow(ws, str(body.workflowId, 100));
     if (!wf) return c.json({ error: 'Workflow not found', code: 'not_found' }, 404);
@@ -204,6 +255,9 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   sandbox.post('/:token/uploads', async (c) => {
+    const ip = clientIp(c, config.trustProxy);
+    const blocked = limited(c, `upload:${ip || c.get('workspace').id}`, LIMITS.upload);
+    if (blocked) return blocked;
     const body = await c.req.parseBody().catch(() => ({})) as Record<string, unknown>;
     const file = body.file;
     if (!(file instanceof File)) return c.json({ error: 'file field is required (multipart/form-data)' }, 400);
@@ -242,6 +296,9 @@ export function createApp(deps: AppDeps): Hono {
 
   sandbox.post('/:token/leads', async (c) => {
     const ws = c.get('workspace');
+    const ip = clientIp(c, config.trustProxy);
+    const blocked = limited(c, `lead:${ip || ws.id}`, LIMITS.lead);
+    if (blocked) return blocked;
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const type = str(body.type, 30) as LeadType;
     if (!['book_call', 'request_workflow', 'feedback'].includes(type)) return c.json({ error: 'Invalid lead type' }, 400);
@@ -263,14 +320,78 @@ export function createApp(deps: AppDeps): Hono {
   app.route('/api/sandbox', sandbox);
 
   // =====================================================================
+  // Report for the decision maker (public, keyed by its own random token)
+  // =====================================================================
+  const findPublished = (token: string) => {
+    const report = /^[a-z0-9]{16}$/.test(token) ? store.getReportByToken(token) : undefined;
+    const ws = report ? store.getWorkspace(report.workspaceId) : undefined;
+    return report && ws && report.status === 'published' && ws.status !== 'archived' ? { report, ws } : null;
+  };
+
+  app.get('/api/report/:token', (c) => {
+    const ip = clientIp(c, config.trustProxy);
+    const blocked = ip ? limited(c, `ip:${ip}`, LIMITS.sandbox) : null;
+    if (blocked) return blocked;
+    const found = findPublished(c.req.param('token'));
+    if (!found) return c.json({ error: 'Report not found', code: 'not_found' }, 404);
+    const { report, ws } = found;
+    if (c.req.query('preview') === undefined) {
+      const ts = nowIso();
+      report.views += 1;
+      report.firstViewedAt ??= ts;
+      report.lastViewedAt = ts;
+      store.upsertReport(report);
+    }
+    return c.json({ report: publicReport(report, ws) });
+  });
+
+  /** "Yes, let's schedule the Kickstart": becomes a lead the founder sees in the console. */
+  app.post('/api/report/:token/accept', async (c) => {
+    const found = findPublished(c.req.param('token'));
+    if (!found) return c.json({ error: 'Report not found', code: 'not_found' }, 404);
+    const ip = clientIp(c, config.trustProxy);
+    const blocked = limited(c, `lead:${ip || found.ws.id}`, LIMITS.lead);
+    if (blocked) return blocked;
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const name = str(body.name, 120).trim();
+    const contact = str(body.email, 200).trim();
+    if (!name || !contact) return c.json({ error: 'Please leave your name and an email or phone number', code: 'missing_contact' }, 400);
+    const { report, ws } = found;
+    const lead: Lead = {
+      id: `lead_${shortId()}`,
+      workspaceId: ws.id,
+      type: 'book_call',
+      name,
+      email: contact,
+      message: `[${report.lang === 'vi' ? 'Báo cáo' : 'Report'}: ${report.offer.title}] ${str(body.message, 2000)}`.trim(),
+      sessionId: `report_${report.id}`,
+      createdAt: nowIso(),
+    };
+    store.addLead(lead);
+    report.acceptedAt = lead.createdAt;
+    store.upsertReport(report);
+    return c.json({ ok: true });
+  });
+
+  // =====================================================================
   // Admin console (founder only)
   // =====================================================================
   const admin = new Hono();
 
   admin.use('*', async (c, next) => {
+    const ip = clientIp(c, config.trustProxy) || 'unknown';
+    const failKey = `admin-fail:${ip}`;
+    if (config.rateLimit && limiter.peek(failKey) >= LIMITS.adminFail.limit) {
+      c.header('retry-after', String(Math.ceil(LIMITS.adminFail.windowMs / 1000)));
+      return c.json({ error: 'Too many failed sign-ins. Try again in 15 minutes.', code: 'rate_limited' }, 429);
+    }
     const auth = c.req.header('authorization') ?? '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!token || token !== config.adminToken) return c.json({ error: 'Unauthorized', code: 'unauthorized' }, 401);
+    if (!token || !sameSecret(token, config.adminToken)) {
+      limiter.count(failKey, LIMITS.adminFail.windowMs);
+      return c.json({ error: 'Unauthorized', code: 'unauthorized' }, 401);
+    }
+    limiter.reset(failKey);
     await next();
   });
 
@@ -306,6 +427,7 @@ export function createApp(deps: AppDeps): Hono {
       stats: {
         runs: store.listRuns({ workspaceId: w.id }).length,
         leads: store.listLeads(w.id).length,
+        report: (() => { const r = store.listReports(w.id)[0]; return r ? { id: r.id, status: r.status, views: r.views, accepted: !!r.acceptedAt } : null; })(),
       },
     }));
     return c.json({ workspaces: list });
@@ -315,9 +437,13 @@ export function createApp(deps: AppDeps): Hono {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const company = str(body.company, 120).trim();
     if (!company) return c.json({ error: 'company is required' }, 400);
-    let token = slugify(str(body.token, 64) || company);
-    while (store.getWorkspaceByToken(token)) token = `${slugify(company)}-${shortId(4)}`;
+    const custom = str(body.token, 64).trim() ? slugify(str(body.token, 64)) : '';
+    let token = custom.length >= MIN_CUSTOM_TOKEN && !store.getWorkspaceByToken(custom) ? custom : newInviteToken(custom || company);
+    while (store.getWorkspaceByToken(token)) token = newInviteToken(company);
     const ts = nowIso();
+    const expiresAt = body.expiresAt === null ? undefined
+      : typeof body.expiresAt === 'string' && !Number.isNaN(Date.parse(body.expiresAt)) ? new Date(body.expiresAt).toISOString()
+      : config.defaultSandboxDays > 0 ? new Date(Date.now() + config.defaultSandboxDays * 86_400_000).toISOString() : undefined;
     const ws: Workspace = {
       id: `ws_${shortId()}`,
       token,
@@ -340,6 +466,7 @@ export function createApp(deps: AppDeps): Hono {
       notes: str(body.notes, 4000),
       createdAt: ts,
       updatedAt: ts,
+      ...(expiresAt ? { expiresAt } : {}),
     };
     store.upsertWorkspace(ws);
     return c.json({ workspace: ws }, 201);
@@ -365,8 +492,10 @@ export function createApp(deps: AppDeps): Hono {
     if (typeof body.notes === 'string') ws.notes = body.notes.slice(0, 4000);
     if (body.language !== undefined) ws.language = asLang(body.language, ws.language);
     if (typeof body.status === 'string' && ['draft', 'active', 'converted', 'archived'].includes(body.status)) ws.status = body.status as WorkspaceStatus;
-    if (typeof body.token === 'string' && body.token.trim()) {
+    if (body.regenerateToken === true) ws.token = newInviteToken(ws.company);
+    else if (typeof body.token === 'string' && body.token.trim() && slugify(body.token) !== ws.token) {
       const t = slugify(body.token);
+      if (t.length < MIN_CUSTOM_TOKEN) return c.json({ error: `The link code needs at least ${MIN_CUSTOM_TOKEN} characters so it cannot be guessed`, code: 'weak_token' }, 400);
       const clash = store.getWorkspaceByToken(t);
       if (clash && clash.id !== ws.id) return c.json({ error: 'Token already used by another sandbox' }, 409);
       ws.token = t;
@@ -433,6 +562,82 @@ export function createApp(deps: AppDeps): Hono {
 
   admin.get('/workspaces/:id/runs', (c) => c.json({ runs: store.listRuns({ workspaceId: c.req.param('id') }).slice(0, 200) }));
   admin.get('/workspaces/:id/leads', (c) => c.json({ leads: store.listLeads(c.req.param('id')) }));
+
+  // ---- Data studio: synthetic data shaped like the prospect's company -------------------
+  admin.get('/datagen/presets', (c) => c.json({ presets: PRESET_KEYS }));
+
+  /** Screenshots, template files or PDFs the prospect shared, for the blueprint proposal. */
+  admin.post('/uploads', async (c) => {
+    const body = await c.req.parseBody().catch(() => ({})) as Record<string, unknown>;
+    const file = body.file;
+    if (!(file instanceof File)) return c.json({ error: 'file field is required (multipart/form-data)' }, 400);
+    try {
+      const meta = await uploads.save(file.name, Buffer.from(await file.arrayBuffer()));
+      return c.json({ upload: { ...meta, text: undefined, hasText: !!meta.text } });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : 'Upload failed' }, 400);
+    }
+  });
+
+  admin.post('/datagen/blueprint', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const company = str(body.company, 120).trim();
+    if (!company) return c.json({ error: 'company is required' }, 400);
+    const files = (Array.isArray(body.uploadIds) ? body.uploadIds : []).slice(0, 6)
+      .map((id) => (typeof id === 'string' && /^upl_[a-z0-9]+$/.test(id) ? uploads.get(id) : undefined))
+      .filter((u): u is NonNullable<typeof u> => !!u)
+      .map((u) => ({ name: u.meta.name, mime: u.meta.mime, bytes: u.bytes, text: u.meta.text }));
+    const asOf = /^\d{4}-\d{2}-\d{2}$/.test(str(body.asOf, 10)) ? str(body.asOf, 10) : undefined;
+    const blueprint = await proposeBlueprint(provider, { company, industry: str(body.industry, 200), notes: str(body.notes, 8000), headers: str(body.headers, 8000), presetKey: str(body.presetKey, 40) || undefined, files, asOf });
+    return c.json({ blueprint });
+  });
+
+  admin.post('/datagen/preview', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const blueprint = normalizeBlueprint(body.blueprint);
+    if (!blueprint) return c.json({ error: 'A blueprint with a company name is required' }, 400);
+    return c.json({ blueprint, data: generateData(blueprint) });
+  });
+
+  admin.post('/workspaces/:id/datagen/apply', async (c) => {
+    const ws = store.getWorkspace(c.req.param('id'));
+    if (!ws) return c.json({ error: 'Not found' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const blueprint = normalizeBlueprint(body.blueprint);
+    if (!blueprint) return c.json({ error: 'A blueprint with a company name is required' }, 400);
+    applyGeneratedData(ws, blueprint, { mode: body.mode === 'merge' ? 'merge' : 'replace', setWorkflows: body.setWorkflows === true });
+    store.upsertWorkspace(ws);
+    return c.json({ workspace: adminView(ws), resolved: resolveWorkflows(ws) });
+  });
+
+  // ---- Reports for the decision maker ---------------------------------------------------
+  admin.get('/workspaces/:id/reports', (c) => c.json({ reports: store.listReports(c.req.param('id')) }));
+
+  admin.post('/workspaces/:id/reports', async (c) => {
+    const ws = store.getWorkspace(c.req.param('id'));
+    if (!ws) return c.json({ error: 'Not found' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const runs = store.listRuns({ workspaceId: ws.id }).filter((r) => r.status === 'done');
+    if (!runs.length) return c.json({ error: 'No finished runs yet: the report needs at least one', code: 'no_runs' }, 400);
+    const report = await buildReport(ws, runs, store.listLeads(ws.id), asLang(body.lang, ws.language), provider);
+    store.upsertReport(report);
+    return c.json({ report }, 201);
+  });
+
+  admin.get('/reports/:id', (c) => {
+    const report = store.getReport(c.req.param('id'));
+    return report ? c.json({ report }) : c.json({ error: 'Not found' }, 404);
+  });
+
+  admin.put('/reports/:id', async (c) => {
+    const report = store.getReport(c.req.param('id'));
+    if (!report) return c.json({ error: 'Not found' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    store.upsertReport(applyReportEdits(report, body));
+    return c.json({ report });
+  });
+
+  admin.delete('/reports/:id', (c) => (store.deleteReport(c.req.param('id')) ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404)));
 
   /** "Build me a workflow": the founder's agent drafts a definition from a prospect brief. */
   admin.post('/ai/draft-workflow', async (c) => {

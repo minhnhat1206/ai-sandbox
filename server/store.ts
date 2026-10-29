@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Lead, Run, Workspace } from '../shared/types.ts';
+import type { Lead, Report, Run, Workspace } from '../shared/types.ts';
 import { demoWorkspace } from './seed.ts';
 
 export interface DB {
@@ -8,6 +8,7 @@ export interface DB {
   workspaces: Workspace[];
   runs: Run[];
   leads: Lead[];
+  reports: Report[];
 }
 
 /** Fill fields added after the first release so older db.json files keep working. */
@@ -19,7 +20,7 @@ function migrateRun(run: Run): Run {
 }
 
 function emptyDb(): DB {
-  return { version: 1, workspaces: [demoWorkspace()], runs: [], leads: [] };
+  return { version: 1, workspaces: [demoWorkspace()], runs: [], leads: [], reports: [] };
 }
 
 /**
@@ -31,9 +32,12 @@ export class Store {
   private db: DB;
   private file: string | null;
   private timer: NodeJS.Timeout | null = null;
+  private readonly backupDays: number;
+  private lastBackupDay = '';
 
-  constructor(dataDir: string | null) {
+  constructor(dataDir: string | null, opts: { backupDays?: number } = {}) {
     this.file = dataDir ? path.resolve(dataDir, 'db.json') : null;
+    this.backupDays = opts.backupDays ?? 14;
     this.db = this.load();
   }
 
@@ -46,6 +50,7 @@ export class Store {
         workspaces: (parsed.workspaces ?? []).map(migrateWorkspace),
         runs: (parsed.runs ?? []).map(migrateRun),
         leads: parsed.leads ?? [],
+        reports: parsed.reports ?? [],
       };
     } catch (err) {
       const backup = `${this.file}.${Date.now()}.bak`;
@@ -72,6 +77,25 @@ export class Store {
     const tmp = `${this.file}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(this.db, null, 2));
     fs.renameSync(tmp, this.file);
+    this.snapshotDaily();
+  }
+
+  /** Keep one copy of db.json per day in DATA_DIR/backups, pruned to the last `backupDays`. */
+  private snapshotDaily(): void {
+    if (!this.file || this.backupDays <= 0) return;
+    const day = new Date().toISOString().slice(0, 10);
+    if (day === this.lastBackupDay) return;
+    try {
+      const dir = path.join(path.dirname(this.file), 'backups');
+      fs.mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, `db-${day}.json`);
+      if (!fs.existsSync(target)) fs.copyFileSync(this.file, target);
+      const old = fs.readdirSync(dir).filter((f) => /^db-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort().reverse().slice(this.backupDays);
+      for (const f of old) fs.rmSync(path.join(dir, f));
+      this.lastBackupDay = day;
+    } catch (err) {
+      console.error('[store] daily backup failed:', err);
+    }
   }
 
   // ---- workspaces ----------------------------------------------------------
@@ -96,6 +120,7 @@ export class Store {
     this.db.workspaces = this.db.workspaces.filter((w) => w.id !== id);
     this.db.runs = this.db.runs.filter((r) => r.workspaceId !== id);
     this.db.leads = this.db.leads.filter((l) => l.workspaceId !== id);
+    this.db.reports = this.db.reports.filter((r) => r.workspaceId !== id);
     this.save();
     return this.db.workspaces.length < before;
   }
@@ -128,6 +153,32 @@ export class Store {
     this.db.leads.push(lead);
     this.save();
     return lead;
+  }
+
+  // ---- reports ---------------------------------------------------------------
+  listReports(workspaceId?: string): Report[] {
+    return this.db.reports
+      .filter((r) => (workspaceId ? r.workspaceId === workspaceId : true))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  getReport(id: string): Report | undefined {
+    return this.db.reports.find((r) => r.id === id);
+  }
+  getReportByToken(token: string): Report | undefined {
+    return this.db.reports.find((r) => r.token === token);
+  }
+  upsertReport(report: Report): Report {
+    const i = this.db.reports.findIndex((r) => r.id === report.id);
+    if (i >= 0) this.db.reports[i] = report;
+    else this.db.reports.push(report);
+    this.save();
+    return report;
+  }
+  deleteReport(id: string): boolean {
+    const before = this.db.reports.length;
+    this.db.reports = this.db.reports.filter((r) => r.id !== id);
+    this.save();
+    return this.db.reports.length < before;
   }
 
   /** For tests and admin export. */

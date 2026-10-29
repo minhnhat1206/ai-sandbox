@@ -97,7 +97,7 @@ async function runStep(
     buffer += text;
     void emit({ type: 'step.delta', stepId: step.id, text });
   };
-  const meta = { workflowId: wf.id, stepId: step.id, lang: run.lang, inputs: run.inputs };
+  const meta = { workflowId: wf.id, stepId: step.id, lang: run.lang, inputs: run.inputs, company: ws.company, asOf: ws.dataAsOf };
   const getBytes = (id: string) => opts.getUpload?.(id)?.bytes;
 
   if (!step.agent) {
@@ -235,7 +235,7 @@ export async function runChat(req: ChatRequest, provider: Provider, emit: (e: Ru
         {
           system: renderTemplate(workflow.chat.system, ctx),
           messages: messages.slice(-20),
-          meta: { workflowId: workflow.id, stepId: 'chat', lang: req.lang, inputs: { message: lastUser } },
+          meta: { workflowId: workflow.id, stepId: 'chat', lang: req.lang, inputs: { message: lastUser }, company: workspace.company, asOf: workspace.dataAsOf },
         },
         (text) => {
           buffer += text;

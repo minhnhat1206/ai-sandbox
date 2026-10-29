@@ -28,9 +28,24 @@ export interface Config {
   port: number;
   /** Default USD cap for a new sandbox. */
   defaultBudgetUsd: number;
+  /** New sandboxes expire after this many days (0 = never). */
+  defaultSandboxDays: number;
+  /** Behind a reverse proxy: read the client IP from X-Forwarded-For. */
+  trustProxy: boolean;
+  /** Per-IP and per-sandbox request limits (RATE_LIMIT=off disables them). */
+  rateLimit: boolean;
+  /** Daily db.json snapshots kept in DATA_DIR/backups (0 = no snapshots). */
+  backupDays: number;
 }
 
 export const DEFAULT_ADMIN_TOKEN = 'change-me';
+
+/** Why this admin token must not be used on a public server ('' when it is fine). */
+export function weakAdminTokenReason(token: string): string {
+  if (token === DEFAULT_ADMIN_TOKEN) return 'ADMIN_TOKEN is the default value';
+  if (token.length < 16) return 'ADMIN_TOKEN is shorter than 16 characters';
+  return '';
+}
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const requested = (env.AI_PROVIDER ?? 'mock').toLowerCase();
@@ -50,5 +65,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: env.DATA_DIR || './data',
     port: Number(env.PORT ?? 3000),
     defaultBudgetUsd: Math.max(0, Number(env.DEFAULT_BUDGET_USD) || 10),
+    defaultSandboxDays: env.DEFAULT_SANDBOX_DAYS === undefined ? 30 : Math.max(0, Number(env.DEFAULT_SANDBOX_DAYS) || 0),
+    trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
+    rateLimit: (env.RATE_LIMIT ?? 'on').toLowerCase() !== 'off',
+    backupDays: env.BACKUP_DAYS === undefined ? 14 : Math.max(0, Number(env.BACKUP_DAYS) || 0),
   };
 }

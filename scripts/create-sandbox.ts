@@ -6,6 +6,8 @@
  */
 import fs from 'node:fs';
 import { loadDotEnv, readConfig } from '../server/config.ts';
+import { newInviteToken } from '../server/app.ts';
+import { applyGeneratedData, heuristicBlueprint } from '../server/datagen/index.ts';
 import { nowIso, shortId, slugify } from '../server/ids.ts';
 import { Store } from '../server/store.ts';
 import { CATALOG } from '../shared/catalog/index.ts';
@@ -35,6 +37,14 @@ if (unknown.length) {
   process.exit(1);
 }
 
+/**
+ * "generateData": { "industry"?, "notes"?, "headers"?, "presetKey"? } fills the sandbox with
+ * synthetic tables, documents and samples (same generator as the admin data studio). Tables and
+ * documents given explicitly in the payload win over generated ones with the same name.
+ */
+const gen = payload.generateData && typeof payload.generateData === 'object' ? (payload.generateData as Record<string, string>) : null;
+const blueprint = gen ? heuristicBlueprint({ company: payload.company as string, industry: gen.industry ?? String(payload.industry ?? ''), notes: gen.notes ?? String(payload.brief ?? ''), headers: gen.headers ?? '', presetKey: gen.presetKey }) : null;
+
 const base = `http://localhost:${cfg.port}`;
 const headers = { 'content-type': 'application/json', authorization: `Bearer ${cfg.adminToken}` };
 
@@ -48,8 +58,18 @@ async function viaApi(): Promise<Workspace | null> {
   const created = await fetch(`${base}/api/admin/workspaces`, { method: 'POST', headers, body: JSON.stringify(payload) });
   if (!created.ok) throw new Error(`create failed: ${created.status} ${await created.text()}`);
   const { workspace } = (await created.json()) as { workspace: Workspace };
+  if (blueprint) {
+    const applied = await fetch(`${base}/api/admin/workspaces/${workspace.id}/datagen/apply`, { method: 'POST', headers, body: JSON.stringify({ blueprint, mode: 'merge', setWorkflows: !Array.isArray(payload.workflowIds) }) });
+    if (!applied.ok) throw new Error(`data generation failed: ${applied.status} ${await applied.text()}`);
+  }
   const patch: Record<string, unknown> = {};
-  for (const k of ['knowledge', 'customWorkflows', 'overrides', 'token', 'expiresAt', 'dataSources', 'mcpServers'] as const) if (payload[k] !== undefined) patch[k] = payload[k];
+  for (const k of ['customWorkflows', 'overrides', 'expiresAt', 'mcpServers'] as const) if (payload[k] !== undefined) patch[k] = payload[k];
+  if (payload.knowledge !== undefined || payload.dataSources !== undefined) {
+    // Merge explicit tables/documents with generated ones (explicit wins on a name clash).
+    const current = ((await (await fetch(`${base}/api/admin/workspaces/${workspace.id}`, { headers })).json()) as { workspace: Workspace }).workspace;
+    if (Array.isArray(payload.dataSources)) { const names = new Set((payload.dataSources as { name: string }[]).map((d) => d.name)); patch.dataSources = [...current.dataSources.filter((d) => !names.has(d.name)), ...(payload.dataSources as object[])]; }
+    if (Array.isArray(payload.knowledge)) { const titles = new Set((payload.knowledge as { title: string }[]).map((k) => k.title)); patch.knowledge = [...current.knowledge.filter((k) => !titles.has(k.title)), ...(payload.knowledge as object[])]; }
+  }
   if (Object.keys(patch).length) {
     const updated = await fetch(`${base}/api/admin/workspaces/${workspace.id}`, { method: 'PUT', headers, body: JSON.stringify(patch) });
     if (!updated.ok) throw new Error(`update failed: ${updated.status} ${await updated.text()}`);
@@ -61,8 +81,9 @@ async function viaApi(): Promise<Workspace | null> {
 function viaStore(): Workspace {
   const store = new Store(cfg.dataDir);
   const company = (payload.company as string).trim();
-  let token = slugify(typeof payload.token === 'string' ? payload.token : company);
-  while (store.getWorkspaceByToken(token)) token = `${slugify(company)}-${shortId(4)}`;
+  const custom = typeof payload.token === 'string' ? slugify(payload.token) : '';
+  let token = custom.length >= 12 ? custom : newInviteToken(custom || company);
+  while (store.getWorkspaceByToken(token)) token = newInviteToken(company);
   const ts = nowIso();
   const ws: Workspace = {
     id: `ws_${shortId()}`,
@@ -86,7 +107,18 @@ function viaStore(): Workspace {
     notes: String(payload.notes ?? ''),
     createdAt: ts,
     updatedAt: ts,
+    expiresAt: cfg.defaultSandboxDays > 0 ? new Date(Date.now() + cfg.defaultSandboxDays * 86_400_000).toISOString() : undefined,
   };
+  if (blueprint) {
+    // Generate first, then let explicit payload tables/documents replace same-named generated ones.
+    const explicit = { dataSources: ws.dataSources, knowledge: ws.knowledge, overrides: ws.overrides };
+    applyGeneratedData(ws, blueprint, { mode: 'replace', setWorkflows: !Array.isArray(payload.workflowIds) });
+    const names = new Set(explicit.dataSources.map((d) => d.name));
+    ws.dataSources = [...ws.dataSources.filter((d) => !names.has(d.name)), ...explicit.dataSources];
+    const titles = new Set(explicit.knowledge.map((k) => k.title));
+    ws.knowledge = [...ws.knowledge.filter((k) => !titles.has(k.title)), ...explicit.knowledge];
+    for (const [id, o] of Object.entries(explicit.overrides)) ws.overrides[id] = { ...ws.overrides[id], ...o, samples: { ...ws.overrides[id]?.samples, ...o.samples } };
+  }
   store.upsertWorkspace(ws);
   store.flush();
   return ws;

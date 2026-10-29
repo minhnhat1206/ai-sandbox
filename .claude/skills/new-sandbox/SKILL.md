@@ -22,12 +22,15 @@ Output: a live sandbox at `/s/<token>` plus a demo script.
    - leadership unsure where to start, shadow AI, new laws → `ai-readiness-agent`, `ai-policy-agent`
      (these two ARE our Readiness Assessment and AI policy offers: always enable them)
    Pick 5–8; the gallery should feel built for them, not a catalog dump.
-3. **Connected data**: ask the prospect for CSV exports (orders, receivables, inventory,
-   tickets) and add them as `dataSources` so the agent workflows (`order-care-agent`,
-   `receivables-agent`, `weekly-ops-agent`, `inventory-agent`, `meeting-prep-agent`) run on
-   THEIR numbers. Column names must be lower-case identifiers; when nothing is available,
-   copy the demo tables from `server/seed-data.ts` and mark them SAMPLE. Real MCP servers go in
-   `mcpServers` (admin tab "Kết nối MCP"); they only work with the real provider.
+3. **Connected data**: we never ask for real data before signing. Generate synthetic data
+   shaped like their company: add `"generateData": { "industry": "...", "notes": "<pains>",
+   "headers": "Phiếu xuất kho: Số phiếu, Ngày xuất, Khách hàng, ..." , "presetKey"?: "packaging" }`
+   to the payload (presets: fmcg, packaging, building, fnb, medical, garment, electronics,
+   agrifood, trading). It creates the 11 canonical tables every agent needs, one extra table per
+   header line in THEIR column names, 6 policy documents and sample inputs pointing at the new
+   data. With real Claude, prefer the admin studio (Connected data → "Tạo dữ liệu theo ngành"):
+   it also reads software screenshots and proposes custom customers/products. Real MCP servers
+   go in `mcpServers` (admin tab "Kết nối MCP"); they only work with the real provider.
 4. **Knowledge**: paste the documents the prospect shared (or a realistic placeholder
    clearly marked "SAMPLE – replace with real policy") so `policy-helpdesk`,
    `order-care-agent`, `quote-builder-agent` and `expense-audit-agent` answer from "their" documents.
@@ -45,12 +48,14 @@ Output: a live sandbox at `/s/<token>` plus a demo script.
      "brief": "HQ in Japan pushes AI... pains: ...",
      "workflowIds": ["order-care-agent", "quote-builder-agent", "bank-recon-agent", "data-chat", "policy-helpdesk", "ai-readiness-agent"],
      "knowledge": [{ "title": "Chính sách giao hàng", "content": "..." }],
-     "dataSources": [{ "name": "orders", "description": "Đơn hàng tháng này", "csv": "order_id,customer,amount,status\n..." }],
+     "generateData": { "notes": "Công nợ nhà thầu kéo dài, báo giá thép mất cả ngày", "headers": "Phiếu giao hàng: Số phiếu, Ngày giao, Khách hàng, Sản phẩm, Số lượng, Đơn giá, Thành tiền" },
      "customWorkflows": [],
      "notes": "Discovery call 2026-11-03. Decision maker: GD. Budget: Zone B."
    }
    ```
 7. **Verify**: open the link in the browser (or `curl /api/sandbox/<token>`), run one
    workflow with sample data, check the knowledge chat answers from the documents.
-8. **Hand over**: the invite link, which workflows are on and why, the credit budget,
+8. **After the trial**: admin → sandbox → "Báo cáo cho sếp" builds the decision-maker report
+   from their runs; edit, publish, send the `/r/<token>` link and watch the view counter.
+9. **Hand over**: the invite link, which workflows are on and why, the credit budget,
    and a 5-line demo script (use `/demo-script` for a full one).

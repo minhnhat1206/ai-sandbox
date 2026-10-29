@@ -1,0 +1,24 @@
+# systemd unit: copy to /etc/systemd/system/ai-sandbox.service, then
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ai-sandbox
+[Unit]
+Description=AI Sandbox (no-account AI trial platform)
+After=network.target
+
+[Service]
+Type=simple
+User=sandbox
+WorkingDirectory=/opt/ai-sandbox
+Environment=NODE_ENV=production
+Environment=TRUST_PROXY=1
+EnvironmentFile=/opt/ai-sandbox/.env
+ExecStart=/usr/bin/npx tsx server/index.ts
+Restart=on-failure
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-sandbox/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

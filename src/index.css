@@ -142,3 +142,9 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Report page: keep the dark hero and offer blocks when printing to PDF. */
+@media print {
+  .report, .report * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-card, .report section { break-inside: avoid; }
+}

@@ -53,6 +53,11 @@ export default function Workspaces() {
               </div>
               <div className="hidden md:block"><BudgetMeter spent={w.spentUsd ?? 0} budget={w.budgetUsd ?? 0} label={t('ad_ws_spent')} compact /></div>
               <span className="hidden text-[12.5px] text-sand-10 tnum sm:block"><Icon name="bolt" size={13} className="mr-1 inline text-jade-9" />{w.stats.runs} · <Icon name="inbox" size={13} className="mx-1 inline text-jade-9" />{w.stats.leads}</span>
+              {w.stats.report && (
+                <Badge tone={w.stats.report.accepted ? 'brand' : w.stats.report.status === 'published' ? 'info' : 'neutral'}>
+                  <Icon name="FileText" size={12} /> {w.stats.report.accepted ? t('ad_rp_accepted') : w.stats.report.status === 'published' ? t('ad_rp_views', { n: w.stats.report.views }) : t('ad_rp_draft')}
+                </Badge>
+              )}
               <Badge tone={STATUS_TONE[w.status]} dot>{w.status}</Badge>
               <Icon name="chevronRight" size={16} className="text-sand-7 transition group-hover:translate-x-0.5 group-hover:text-jade-9" />
             </Link>

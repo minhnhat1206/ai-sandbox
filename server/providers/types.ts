@@ -10,7 +10,7 @@ export interface CompletionRequest {
   /** Resolve the raw bytes of an attachment (used to build document/image blocks). */
   getBytes?: (id: string) => Buffer | undefined;
   /** Hints for the mock provider so demo output looks like the real thing. */
-  meta: { workflowId: string; stepId: string; lang: Lang; inputs: Record<string, string> };
+  meta: { workflowId: string; stepId: string; lang: Lang; inputs: Record<string, string>; company?: string; asOf?: string };
 }
 
 export interface CompletionResult {
@@ -26,6 +26,14 @@ export interface AgentRequest extends CompletionRequest {
   skills: SkillName[];
   mcpServers: McpServer[];
   maxTurns: number;
+}
+
+/** A file given to completeText (screenshots, template files): image/PDF bytes or extracted text. */
+export interface TextAttachment {
+  name: string;
+  mime: string;
+  bytes: Buffer;
+  text?: string;
 }
 
 export interface AgentHooks {
@@ -47,8 +55,8 @@ export interface Provider {
   complete(req: CompletionRequest, onDelta: (text: string) => void, signal?: AbortSignal): Promise<CompletionResult>;
   /** Agent loop: the model may call tools until it answers. */
   runAgent(req: AgentRequest, hooks: AgentHooks, signal?: AbortSignal): Promise<CompletionResult>;
-  /** Non-streaming helper used for admin tooling (e.g. drafting a workflow). */
-  completeText(system: string, user: string, maxTokens?: number): Promise<string>;
+  /** Non-streaming helper used for admin tooling (drafting a workflow, proposing a data blueprint). */
+  completeText(system: string, user: string, maxTokens?: number, attachments?: TextAttachment[]): Promise<string>;
 }
 
 export class ProviderError extends Error {

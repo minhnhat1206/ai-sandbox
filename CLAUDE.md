@@ -14,7 +14,8 @@ Anthropic credits, rate the results, and book a call. The founder manages everyt
 | `npm run check` | + catalog validation + production build |
 | `npm run smoke` | Playwright end-to-end run with screenshots in `e2e/screenshots/` |
 | `npm run build && npm start` | production: Hono serves `dist/` + API on `PORT` |
-| `npx tsx scripts/create-sandbox.ts payload.json` | create a prospect sandbox from JSON |
+| `npx tsx scripts/create-sandbox.ts payload.json` | create a prospect sandbox from JSON (`generateData` for synthetic data) |
+| `npm run real-check` | all workflows against real Claude: status, tools, cost (`--mock`, `--industry`, `--only`, `--max-usd`) |
 
 ## Map
 - `shared/` types (`types.ts`), workflow catalog (`catalog/`), template engine +
@@ -25,12 +26,16 @@ Anthropic credits, rate the results, and book a call. The founder manages everyt
   calculate, artifact), `providers/` (`mock` = zero-key demo with scripted agents in
   `mock-agents.ts` + `mock-agents-extra.ts` running real tools; `anthropic` = Claude with tool loop, MCP connector,
   web search, Agent Skills + Files API), `uploads.ts` (PDF/CSV/image intake, unpdf text),
+  `datagen/` synthetic-data studio (industry presets, AI/heuristic blueprint, generator of the
+  11 canonical tables + extra tables from pasted headers, policy docs, sample overrides),
+  `report.ts` decision-maker report (metrics from runs, Kickstart offer), `ratelimit.ts`,
   `store.ts` (JSON file `data/db.json`), `seed.ts` + `seed-data.ts` (demo workspace with
   11 CSV tables and 6 policy documents), `config.ts` (.env loader).
-- `src/` React app. `pages/sandbox/*` prospect flow, `pages/admin/*` founder console,
+- `src/` React app. `pages/sandbox/*` prospect flow, `pages/admin/*` founder console
+  (`DataStudio.tsx`, `ReportsTab.tsx`), `pages/ReportPage.tsx` public report `/r/:token`,
   `i18n/dict.ts` every UI string in VI + EN, `lib/api.ts` fetch + SSE client,
   `lib/markdown.tsx` safe renderer, `icons/` the hand-drawn Lumen icon set,
-  `components/` ui kit, logo, illustrations, charts. Design system: `docs/DESIGN-SYSTEM.md`.
+  `components/` ui kit, logo, illustrations, charts. Design system: `docs/DESIGN-SYSTEM.md`. Deploy: `docs/DEPLOY.md`.
 - `.claude/` rules (auto-loaded), skills (`/new-workflow`, `/new-sandbox`,
   `/demo-script`, `/tune-prompt`, `/release-check`), subagents, hooks (guards + checks).
 
@@ -44,6 +49,11 @@ Anthropic credits, rate the results, and book a call. The founder manages everyt
 - Model default `claude-opus-5-5`, effort `medium` (`.env`). One run = one credit, and each
   sandbox has a USD cap (`budgetUsd`, default `DEFAULT_BUDGET_USD=10`) enforced server-side.
 - Never read/edit `.env` or `data/db.json` by hand (hooks block it).
+- Generated data must keep the canonical table/column names of `server/seed-data.ts`: the
+  scripted mock agents read them. Mock scripts use `c.today`/`c.company`, never hard-coded
+  dates or "Việt Minh". `tests/datagen.test.ts` runs every agent on generated data.
+- Invite tokens are random (`newInviteToken`); custom ones need >= 12 chars. Reports never
+  contain USD.
 
 ## Definition of done
 `npm run check` green, `npm run smoke` green, screenshots looked at, and the change

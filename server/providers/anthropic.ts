@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { UploadMeta } from '../../shared/types.ts';
-import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult, Provider } from './types.ts';
+import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult, Provider, TextAttachment } from './types.ts';
 import { ProviderError } from './types.ts';
 
 export interface AnthropicProviderOptions {
@@ -203,13 +203,20 @@ export class AnthropicProvider implements Provider {
     }
   }
 
-  async completeText(system: string, user: string, maxTokens = 8000): Promise<string> {
+  async completeText(system: string, user: string, maxTokens = 8000, attachments: TextAttachment[] = []): Promise<string> {
     try {
+      const content: BetaContentBlockParam[] = [];
+      for (const a of attachments) {
+        if (a.mime === 'application/pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: a.bytes.toString('base64') }, title: a.name });
+        else if (a.mime.startsWith('image/')) content.push({ type: 'image', source: { type: 'base64', media_type: a.mime as 'image/png' | 'image/jpeg', data: a.bytes.toString('base64') } });
+        else if (a.text) content.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: a.text }, title: a.name });
+      }
+      content.push({ type: 'text', text: user });
       const stream = this.client.beta.messages.stream({
         model: this.model,
         max_tokens: maxTokens,
         system,
-        messages: [{ role: 'user', content: user }],
+        messages: [{ role: 'user', content }],
         output_config: { effort: this.effort },
         betas: FALLBACK_BETAS,
         fallbacks: 'default',
