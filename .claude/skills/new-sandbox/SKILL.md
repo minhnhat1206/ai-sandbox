@@ -20,13 +20,19 @@ Output: a live sandbox at `/s/<token>` plus a demo script.
    - sales/marketing → `sales-outreach`, `social-post`
    - admin/finance paperwork → `invoice-extract`, `translate-business`
    Pick 4–6; the gallery should feel built for them, not a catalog dump.
-3. **Knowledge**: paste the documents the prospect shared (or a realistic placeholder
+3. **Connected data**: ask the prospect for CSV exports (orders, receivables, inventory,
+   tickets) and add them as `dataSources` so the agent workflows (`order-care-agent`,
+   `receivables-agent`, `weekly-ops-agent`, `inventory-agent`, `meeting-prep-agent`) run on
+   THEIR numbers. Column names must be lower-case identifiers; when nothing is available,
+   copy the demo tables from `server/seed-data.ts` and mark them SAMPLE. Real MCP servers go in
+   `mcpServers` (admin tab "Kết nối MCP"); they only work with the real provider.
+4. **Knowledge**: paste the documents the prospect shared (or a realistic placeholder
    clearly marked "SAMPLE – replace with real policy") so `policy-assistant` and
    `customer-reply` answer from "their" documents.
-4. **Custom workflow** if a pain has no catalog match: write a brief and let the
+5. **Custom workflow** if a pain has no catalog match: write a brief and let the
    admin "Xây quy trình riêng" tab draft it, or write the JSON yourself per
    `.claude/rules/03-workflows.md`.
-5. **Create it**. Write a JSON file in the scratchpad and run
+6. **Create it**. Write a JSON file in the scratchpad and run
    `npx tsx scripts/create-sandbox.ts <file.json>`. The script uses the admin API if the
    dev server is up (reads `ADMIN_TOKEN`/`PORT` from `.env`), otherwise writes the
    JSON store directly. Example payload:
@@ -37,11 +43,12 @@ Output: a live sandbox at `/s/<token>` plus a demo script.
      "brief": "HQ in Japan pushes AI... pains: ...",
      "workflowIds": ["company-assistant", "customer-reply", "weekly-report", "policy-assistant"],
      "knowledge": [{ "title": "Chính sách giao hàng", "content": "..." }],
+     "dataSources": [{ "name": "orders", "description": "Đơn hàng tháng này", "csv": "order_id,customer,amount,status\n..." }],
      "customWorkflows": [],
      "notes": "Discovery call 2026-11-03. Decision maker: GD. Budget: Zone B."
    }
    ```
-6. **Verify**: open the link in the browser (or `curl /api/sandbox/<token>`), run one
+7. **Verify**: open the link in the browser (or `curl /api/sandbox/<token>`), run one
    workflow with sample data, check the knowledge chat answers from the documents.
-7. **Hand over**: the invite link, which workflows are on and why, the credit budget,
+8. **Hand over**: the invite link, which workflows are on and why, the credit budget,
    and a 5-line demo script (use `/demo-script` for a full one).

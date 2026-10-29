@@ -3,6 +3,7 @@ import { createApp } from '../server/app.ts';
 import { readConfig } from '../server/config.ts';
 import { MockProvider } from '../server/providers/mock.ts';
 import { Store } from '../server/store.ts';
+import { UploadStore } from '../server/uploads.ts';
 import type { Run, RunEvent, Workspace } from '../shared/types.ts';
 
 const ADMIN = 'test-admin-token';
@@ -13,7 +14,7 @@ const auth = { authorization: `Bearer ${ADMIN}`, 'content-type': 'application/js
 function makeApp() {
   const store = new Store(null);
   const config = readConfig({ ADMIN_TOKEN: ADMIN, AI_PROVIDER: 'mock' });
-  const app = createApp({ store, provider: new MockProvider(0), config });
+  const app = createApp({ store, provider: new MockProvider(0), config, uploads: new UploadStore(null), filesDir: null });
   return { app, store };
 }
 
@@ -74,7 +75,7 @@ describe('public sandbox API', () => {
     const res = await app.request('/api/sandbox/demo/runs', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workflowId: 'weekly-report', inputs: { notes: '' } }),
+      body: JSON.stringify({ workflowId: 'customer-reply', inputs: { message: '' } }),
     });
     const events = await readSse(res);
     expect(events[0].type).toBe('error');
@@ -98,7 +99,7 @@ describe('public sandbox API', () => {
   });
 
   it('accepts feedback and leads', async () => {
-    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'weekly-report', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, costUsd: 0, minutesSaved: 10, startedAt: '' };
+    const run: Run = { id: 'run_x', workspaceId: 'ws_demo', workflowId: 'weekly-report', workflowName: { vi: 'a', en: 'b' }, kind: 'form', sessionId: 's', visitorName: '', lang: 'vi', inputs: {}, steps: [], output: '', status: 'done', provider: 'mock', model: 'mock-demo', inputTokens: 0, outputTokens: 0, costUsd: 0, minutesSaved: 10, trace: [], artifacts: [], actions: [], startedAt: '' };
     store.upsertRun(run);
     const fb = await app.request('/api/sandbox/demo/runs/run_x/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating: 5, feedback: 'great' }) });
     expect(fb.status).toBe(200);

@@ -61,7 +61,38 @@ Hono API  ──► runner.ts ──► Provider (mock | anthropic SDK, streamin
 - Anthropic provider: `claude-opus-5-5` mặc định, effort cấu hình, prompt caching cho system prompt, server-side refusal fallbacks, lỗi được phân loại (auth / rate limit / network).
 - Credit: trừ trước khi chạy, hoàn lại nếu provider lỗi; khách rời trang thì run vẫn hoàn tất và được lưu.
 
-## 5. Thư viện quy trình ban đầu (11)
+## 4b. Agent, công cụ và sản phẩm bàn giao (v0.2)
+Khách không chỉ "hỏi AI"; họ cần AI **làm việc trong hệ thống của họ**. Phiên bản 0.2 thêm:
+
+| Năng lực | Cách hoạt động | Demo (mock) | Thật (Claude) |
+|---|---|---|---|
+| **Agent tự hành** | Bước có `agent: { tools, skills }`; vòng lặp tool-use streaming, tối đa `maxTurns` | Kịch bản gọi **tool thật** trên dữ liệu mẫu | Claude tự lập kế hoạch và gọi tool |
+| **Dữ liệu kết nối** | Admin dán CSV (đơn hàng, công nợ, tồn kho…) vào tab *Dữ liệu kết nối*; tool `query_records`, `aggregate_records` truy vấn/tổng hợp | Có | Có (cùng engine) |
+| **MCP connector** | Tab *Kết nối MCP*: URL + token; truyền qua Anthropic MCP connector (`mcp-client-2025-11-20`) | Không gọi được, hiển thị nhãn | CRM/ERP/Google Workspace thật |
+| **Tài liệu nội bộ** | `search_knowledge` chấm điểm đoạn văn | Có | Có |
+| **Hành động** | `create_ticket`, `draft_email` ghi vào *outbox* của run; không gửi đi | Có | Có |
+| **Artifact** | `create_artifact`: HTML dashboard (iframe sandbox + CSP), bảng, markdown, CSV, JSON | Có | Có |
+| **Agent Skills** | `skills: ['xlsx'|'docx'|'pptx'|'pdf']` → `container.skills` + code execution; file tải về qua Files API | Thay bằng bảng + CSV | File .xlsx/.docx thật |
+| **Web search** | `web_search` server tool (`web_search_20260209`) | Placeholder có ghi chú | Có |
+| **File đầu vào** | Input `type: 'file'` (PDF/ảnh/CSV/txt ≤ 8 MB); PDF trích chữ bằng unpdf | Đọc chữ trích xuất | Gửi document/image block |
+| **Minh bạch** | SSE `tool.call`/`tool.result`/`artifact`/`action`; UI hiển thị dòng thời gian agent, sản phẩm, hành động | Có | Có |
+
+Quy tắc an toàn: tool chỉ chạy server-side với input được kiểm tra; `calculate` chỉ nhận biểu thức số; artifact HTML phục vụ với `Content-Security-Policy: default-src 'none'` và iframe `sandbox=""`; hành động chỉ mô phỏng. Chi tiết trong `.claude/rules/03-workflows.md`.
+
+## 5. Thư viện quy trình (19)
+### Agent (8, xếp đầu gallery)
+| id | Phòng ban | Tool | Sản phẩm |
+|---|---|---|---|
+| order-care-agent | CSKH | orders, customers, receivables, tài liệu, ticket, email | Case file |
+| receivables-agent | Tài chính | receivables (tổng hợp theo tuổi nợ), email | Dashboard HTML, Call list, 3–5 email nhắc |
+| weekly-ops-agent | Vận hành | orders, tickets, email | Dashboard HTML, báo cáo, email gửi GĐ |
+| inventory-agent | Vận hành | inventory | Bảng đặt hàng + CSV |
+| meeting-prep-agent | Kinh doanh | customers, orders, receivables, tickets, web, tài liệu | Brief HTML, talking points |
+| document-review | Chung | file PDF/ảnh/txt, tài liệu | Bảng điều khoản, câu hỏi cho luật sư |
+| data-cleanup | Vận hành | file CSV | Bảng sạch, CSV, nhật ký thay đổi |
+| excel-builder | Tài chính | nguồn dữ liệu + skill xlsx | File .xlsx (thật) / bảng + CSV (demo) |
+
+### Đơn bước (11)
 | id | Phòng ban | Vì sao có trong demo |
 |---|---|---|
 | company-assistant (chat) | Chung | Điểm vào dễ nhất cho người mới |

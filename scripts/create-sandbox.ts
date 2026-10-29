@@ -49,7 +49,7 @@ async function viaApi(): Promise<Workspace | null> {
   if (!created.ok) throw new Error(`create failed: ${created.status} ${await created.text()}`);
   const { workspace } = (await created.json()) as { workspace: Workspace };
   const patch: Record<string, unknown> = {};
-  for (const k of ['knowledge', 'customWorkflows', 'overrides', 'token', 'expiresAt'] as const) if (payload[k] !== undefined) patch[k] = payload[k];
+  for (const k of ['knowledge', 'customWorkflows', 'overrides', 'token', 'expiresAt', 'dataSources', 'mcpServers'] as const) if (payload[k] !== undefined) patch[k] = payload[k];
   if (Object.keys(patch).length) {
     const updated = await fetch(`${base}/api/admin/workspaces/${workspace.id}`, { method: 'PUT', headers, body: JSON.stringify(patch) });
     if (!updated.ok) throw new Error(`update failed: ${updated.status} ${await updated.text()}`);
@@ -76,6 +76,8 @@ function viaStore(): Workspace {
     workflowIds: Array.isArray(payload.workflowIds) ? (payload.workflowIds as string[]) : ['company-assistant', 'customer-reply', 'weekly-report'],
     overrides: (payload.overrides as Workspace['overrides']) ?? {},
     customWorkflows: (payload.customWorkflows as Workspace['customWorkflows']) ?? [],
+    dataSources: Array.isArray(payload.dataSources) ? (payload.dataSources as { name: string; description?: string; csv: string }[]).map((d) => ({ id: `ds_${shortId(6)}`, name: d.name, description: d.description ?? '', csv: d.csv, updatedAt: ts })) : [],
+    mcpServers: [],
     knowledge: Array.isArray(payload.knowledge) ? (payload.knowledge as { title: string; content: string }[]).map((k) => ({ id: `kd_${shortId(6)}`, title: k.title, content: k.content, updatedAt: ts })) : [],
     credits: { total: Number(payload.credits ?? 50), used: 0 },
     status: 'active',

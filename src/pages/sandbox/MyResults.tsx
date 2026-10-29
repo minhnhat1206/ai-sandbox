@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Run } from '@shared/types';
+import { ActionsPanel, ArtifactsPanel } from '@/components/AgentPanel';
 import { EmptyArt } from '@/components/illustrations';
 import { Badge, Button, EmptyState, IconTile, Modal, SectionHead, Skeleton, Stars } from '@/components/ui';
 import { Icon } from '@/icons';
@@ -56,6 +57,7 @@ export default function MyResults() {
                 <p className="truncate text-[14.5px] font-semibold text-jade-12">{pick(r.workflowName)}</p>
                 <p className="text-[12px] text-sand-9 tnum">{new Date(r.startedAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} · {r.minutesSaved} {t('minutes')}</p>
               </div>
+              {(r.artifacts?.length ?? 0) > 0 && <Badge tone="brand"><Icon name="Package" size={12} /> {r.artifacts.length}</Badge>}
               {r.rating ? <Stars value={r.rating} size="sm" /> : <Badge tone="neutral">—</Badge>}
               <Button size="sm" variant="secondary" onClick={() => setOpen(r)} icon="FileText">{t('res_view')}</Button>
             </div>
@@ -63,7 +65,13 @@ export default function MyResults() {
         </div>
       )}
       <Modal open={!!open} onClose={() => setOpen(null)} title={open ? pick(open.workflowName) : ''} wide eyebrow={t('run_result')}>
-        {open && <Markdown text={open.output} />}
+        {open && (
+          <div className="space-y-4">
+            <Markdown text={open.output} />
+            <ArtifactsPanel artifacts={open.artifacts ?? []} urlFor={(a, d) => `/api/sandbox/${encodeURIComponent(token)}/runs/${open.id}/artifacts/${a.id}${d ? '?download' : ''}`} />
+            <ActionsPanel actions={open.actions ?? []} />
+          </div>
+        )}
       </Modal>
     </div>
   );

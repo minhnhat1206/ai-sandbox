@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { sampleInputs, validateInputs } from '@shared/engine/template';
-import type { L, Run, RunEvent } from '@shared/types';
+import type { Action, Artifact, InputField, L, Run, RunEvent, ToolCall } from '@shared/types';
+import { ActionsPanel, AgentTimeline, ArtifactsPanel, CAP_ICON, capabilitiesOf } from '@/components/AgentPanel';
 import { WaitingArt } from '@/components/illustrations';
 import { Alert, Badge, Button, Field, IconTile, Input, Select, Stars, Textarea, useToast } from '@/components/ui';
 import { Icon } from '@/icons';
-import { useLang } from '@/i18n';
-import { ApiError, sandboxApi, streamRun } from '@/lib/api';
+import { useLang, type DictKeyLoose } from '@/i18n';
+import { ApiError, sandboxApi, streamRun, uploadFile } from '@/lib/api';
 import { Markdown } from '@/lib/markdown';
 import { useSandbox } from './context';
 
@@ -21,6 +22,9 @@ export default function WorkflowRun() {
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [steps, setSteps] = useState<StepState[]>([]);
+  const [trace, setTrace] = useState<ToolCall[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +41,9 @@ export default function WorkflowRun() {
 
   if (!wf || wf.kind !== 'form') return <Alert tone="error">{t('sb_not_found')}</Alert>;
 
-  const fill = () => { setInputs(sampleInputs(wf)); setErrors({}); };
+  const caps = capabilitiesOf(wf, view.connectors.length);
+  const isAgent = wf.steps.some((s) => s.agent);
+  const fill = () => { setInputs((s) => ({ ...sampleInputs(wf), ...Object.fromEntries(Object.entries(s).filter(([k]) => wf.inputs.find((f) => f.key === k)?.type === 'file')) })); setErrors({}); };
   const clear = () => { setInputs({}); setErrors({}); };
 
   const go = async () => {
@@ -53,6 +59,9 @@ export default function WorkflowRun() {
     setFeedback('');
     setFeedbackSent(false);
     setSteps([]);
+    setTrace([]);
+    setArtifacts([]);
+    setActions([]);
     setRunning(true);
     const ac = new AbortController();
     abortRef.current = ac;
@@ -63,6 +72,10 @@ export default function WorkflowRun() {
           case 'step.started': setSteps((s) => [...s, { id: e.stepId, title: e.title, text: '', done: false }]); break;
           case 'step.delta': setSteps((s) => s.map((st) => (st.id === e.stepId ? { ...st, text: st.text + e.text } : st))); break;
           case 'step.done': setSteps((s) => s.map((st) => (st.id === e.stepId ? { ...st, done: true } : st))); break;
+          case 'tool.call': setTrace((tr) => [...tr, e.call]); break;
+          case 'tool.result': setTrace((tr) => tr.map((c) => (c.id === e.id ? { ...c, output: e.output, isError: e.isError, durationMs: e.durationMs } : c))); break;
+          case 'artifact': setArtifacts((a) => [...a, e.artifact]); break;
+          case 'action': setActions((a) => [...a, e.action]); break;
           case 'run.done': setRun(e.run); setCredits(e.creditsRemaining); break;
           case 'error': setError(e.code === 'no_credits' ? t('run_error_credits') : e.message); break;
         }
@@ -94,6 +107,8 @@ export default function WorkflowRun() {
   const noCredits = view.creditsRemaining <= 0;
   const hasOutput = steps.length > 0;
   const duration = run?.finishedAt ? ((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1) : null;
+  const runId = run?.id;
+  const artifactUrl = (a: Artifact, download?: boolean) => `/api/sandbox/${encodeURIComponent(token)}/runs/${runId ?? ''}/artifacts/${a.id}${download ? '?download' : ''}`;
 
   return (
     <div className="space-y-5">
@@ -104,6 +119,11 @@ export default function WorkflowRun() {
           <p className="eyebrow">{t('sb_saves', { n: wf.minutesSavedPerRun })}</p>
           <h1 className="display mt-1 text-[26px] font-bold text-jade-12 md:text-[32px]">{pick(wf.name)}</h1>
           <p className="mt-1.5 text-[14.5px] text-sand-10">{pick(wf.description)}</p>
+          {caps.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {caps.map((c) => <Badge key={c} tone={c === 'cap_agent' ? 'dark' : 'brand'}><Icon name={CAP_ICON[c]} size={12} /> {t(c as DictKeyLoose)}</Badge>)}
+            </div>
+          )}
         </div>
       </header>
 
@@ -117,13 +137,21 @@ export default function WorkflowRun() {
               <Button size="sm" variant="ghost" onClick={clear} disabled={running}>{t('run_clear')}</Button>
             </div>
           </div>
+          {isAgent && view.dataSources.length > 0 && (
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px] text-sand-9">
+              <Icon name="Table" size={13} className="text-jade-9" /> {t('sb_data_connected')}
+              {view.dataSources.map((d) => <span key={d.id} className="rounded-full bg-sand-2 px-2 py-0.5 font-mono text-[11px] text-sand-11">{d.name} · {d.rows}</span>)}
+            </p>
+          )}
           <div className="mt-4 space-y-4">
             {wf.inputs.map((f) => {
               const common = { id: `f-${f.key}`, value: inputs[f.key] ?? '', disabled: running };
               const set = (v: string) => setInputs((s) => ({ ...s, [f.key]: v }));
               return (
-                <Field key={f.key} htmlFor={common.id} label={pick(f.label)} required={f.required} help={f.help ? pick(f.help) : undefined} error={errors[f.key]}>
-                  {f.type === 'textarea' ? (
+                <Field key={f.key} htmlFor={common.id} label={pick(f.label)} required={f.required} help={f.help ? pick(f.help) : f.type === 'file' ? t('run_file_hint') : undefined} error={errors[f.key]}>
+                  {f.type === 'file' ? (
+                    <FileInput field={f} token={token} value={inputs[f.key] ?? ''} onChange={set} disabled={running} />
+                  ) : f.type === 'textarea' ? (
                     <Textarea {...common} rows={f.rows ?? 5} placeholder={f.placeholder ? pick(f.placeholder) : undefined} onChange={(e) => set(e.target.value)} />
                   ) : f.type === 'select' ? (
                     <Select {...common} onChange={(e) => set(e.target.value)}>
@@ -144,79 +172,127 @@ export default function WorkflowRun() {
         </section>
 
         {/* ---------------------------------------------------- result */}
-        <section className="paper flex flex-col rounded-xl2 p-5 lg:col-span-3 animate-rise delay-2">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-[15px] font-bold text-jade-12"><Icon name="FileText" size={17} className="text-jade-9" /> {t('run_result')}</h2>
-            {hasOutput && <Button size="sm" variant="secondary" onClick={copy} icon="copy">{t('copy')}</Button>}
-          </div>
-          {error && <div className="mt-3"><Alert tone="error">{error}</Alert></div>}
-          {!hasOutput && !error && (
-            <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-sand-5 bg-sand-1/60 p-10 text-center">
-              <WaitingArt className="mb-3 w-40 text-sand-8" />
-              <p className="max-w-xs text-[13.5px] text-sand-9">{t('run_result_empty')}</p>
+        <div className="space-y-4 lg:col-span-3">
+          <section className="paper flex flex-col rounded-xl2 p-5 animate-rise delay-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-[15px] font-bold text-jade-12"><Icon name="FileText" size={17} className="text-jade-9" /> {t('run_result')}</h2>
+              {hasOutput && <Button size="sm" variant="secondary" onClick={copy} icon="copy">{t('copy')}</Button>}
             </div>
-          )}
-          {hasOutput && (
-            <div ref={outputRef} className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
-              {steps.length > 1 && (
-                <ol className="mb-4 flex items-center gap-2 text-[12px] font-semibold">
-                  {steps.map((s, i) => (
-                    <li key={s.id} className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 ${s.done ? 'bg-jade-3 text-jade-11' : 'bg-sand-3 text-sand-10'}`}>
-                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${s.done ? 'bg-jade-9 text-white' : 'bg-white text-sand-10'}`}>{s.done ? <Icon name="check" size={11} strokeWidth={2.5} /> : i + 1}</span>
-                        {pick(s.title)}
-                      </span>
-                      {i < steps.length - 1 && <span className="h-px w-5 bg-sand-5" />}
-                    </li>
-                  ))}
-                </ol>
-              )}
-              <div className="space-y-6">
-                {steps.map((s, i) => (
-                  <section key={s.id} className="animate-fade">
-                    {steps.length > 1 && <p className="eyebrow mb-2">{t('run_step')} {i + 1} · {pick(s.title)}</p>}
-                    <div className={!s.done && running ? 'caret' : ''}>
-                      <Markdown text={s.text} />
-                    </div>
-                  </section>
-                ))}
+            {error && <div className="mt-3"><Alert tone="error">{error}</Alert></div>}
+            {!hasOutput && !error && (
+              <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-sand-5 bg-sand-1/60 p-10 text-center">
+                <WaitingArt className="mb-3 w-40 text-sand-8" />
+                <p className="max-w-xs text-[13.5px] text-sand-9">{t('run_result_empty')}</p>
               </div>
-            </div>
-          )}
-
-          {run && (
-            <div className="mt-5 space-y-4 border-t border-sand-4 pt-4 animate-rise">
-              <div className="flex flex-wrap items-center gap-2 text-[12px] text-sand-9">
-                <Badge tone="success" dot>{t('run_time_saved', { n: run.minutesSaved })}</Badge>
-                <span className="tnum">· {run.inputTokens + run.outputTokens} {t('run_tokens')}</span>
-                {duration && <span className="tnum">· {duration}{t('run_duration')}</span>}
-                {run.provider === 'mock' && <Badge tone="warn">{t('demo_mode')}</Badge>}
-              </div>
-              <div className="rounded-xl bg-sand-2 p-4">
-                <p className="text-[14px] font-semibold text-jade-12">{t('run_rate')}</p>
-                <div className="mt-1.5"><Stars value={rating} onChange={rate} /></div>
-                {rating && !feedbackSent && (
-                  <div className="mt-3 flex gap-2 animate-rise">
-                    <Input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder={t('run_feedback_placeholder')} />
-                    <Button size="md" variant="secondary" onClick={sendFeedback} icon="send">{t('send')}</Button>
-                  </div>
+            )}
+            {hasOutput && (
+              <div ref={outputRef} className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
+                {steps.length > 1 && (
+                  <ol className="mb-4 flex items-center gap-2 text-[12px] font-semibold">
+                    {steps.map((s, i) => (
+                      <li key={s.id} className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 ${s.done ? 'bg-jade-3 text-jade-11' : 'bg-sand-3 text-sand-10'}`}>
+                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${s.done ? 'bg-jade-9 text-white' : 'bg-white text-sand-10'}`}>{s.done ? <Icon name="check" size={11} strokeWidth={2.5} /> : i + 1}</span>
+                          {pick(s.title)}
+                        </span>
+                        {i < steps.length - 1 && <span className="h-px w-5 bg-sand-5" />}
+                      </li>
+                    ))}
+                  </ol>
                 )}
-                {feedbackSent && <p className="mt-2 flex items-center gap-1 text-xs font-medium text-jade-11"><Icon name="checkCircle" size={14} /> {t('run_rate_thanks')}</p>}
-              </div>
-              <div className="grain relative overflow-hidden rounded-xl2 bg-ink-900 p-5 text-white">
-                <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-jade-8/40 blur-3xl" />
-                <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-[16px] font-bold">{t('run_cta_title')}</p>
-                    <p className="mt-0.5 text-[13.5px] text-white/70">{t('run_cta_sub')}</p>
-                  </div>
-                  <Link to={`/s/${token}/contact?type=book_call&wf=${wf.id}`}><Button icon="calendarCheck" className="shrink-0">{t('run_cta_btn')}</Button></Link>
+                <div className="space-y-6">
+                  {steps.map((s, i) => (
+                    <section key={s.id} className="animate-fade">
+                      {steps.length > 1 && <p className="eyebrow mb-2">{t('run_step')} {i + 1} · {pick(s.title)}</p>}
+                      <div className={!s.done && running ? 'caret' : ''}>
+                        <Markdown text={s.text} />
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+
+            {run && (
+              <div className="mt-5 space-y-4 border-t border-sand-4 pt-4 animate-rise">
+                <div className="flex flex-wrap items-center gap-2 text-[12px] text-sand-9">
+                  <Badge tone="success" dot>{t('run_time_saved', { n: run.minutesSaved })}</Badge>
+                  <span className="tnum">· {run.inputTokens + run.outputTokens} {t('run_tokens')}</span>
+                  {duration && <span className="tnum">· {duration}{t('run_duration')}</span>}
+                  {run.provider === 'mock' && <Badge tone="warn">{t('demo_mode')}</Badge>}
+                </div>
+                <div className="rounded-xl bg-sand-2 p-4">
+                  <p className="text-[14px] font-semibold text-jade-12">{t('run_rate')}</p>
+                  <div className="mt-1.5"><Stars value={rating} onChange={rate} /></div>
+                  {rating && !feedbackSent && (
+                    <div className="mt-3 flex gap-2 animate-rise">
+                      <Input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder={t('run_feedback_placeholder')} />
+                      <Button size="md" variant="secondary" onClick={sendFeedback} icon="send">{t('send')}</Button>
+                    </div>
+                  )}
+                  {feedbackSent && <p className="mt-2 flex items-center gap-1 text-xs font-medium text-jade-11"><Icon name="checkCircle" size={14} /> {t('run_rate_thanks')}</p>}
+                </div>
+                <div className="grain relative overflow-hidden rounded-xl2 bg-ink-900 p-5 text-white">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-jade-8/40 blur-3xl" />
+                  <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[16px] font-bold">{t('run_cta_title')}</p>
+                      <p className="mt-0.5 text-[13.5px] text-white/70">{t('run_cta_sub')}</p>
+                    </div>
+                    <Link to={`/s/${token}/contact?type=book_call&wf=${wf.id}`}><Button icon="calendarCheck" className="shrink-0">{t('run_cta_btn')}</Button></Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+          <AgentTimeline trace={trace} running={running} />
+          {runId && <ArtifactsPanel artifacts={artifacts} urlFor={artifactUrl} />}
+          {!runId && artifacts.length > 0 && <p className="text-[12px] text-sand-9">{t('run_deliverables')}: {artifacts.map((a) => a.title).join(', ')} …</p>}
+          <ActionsPanel actions={actions} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function FileInput({ field, token, value, onChange, disabled }: { field: InputField; token: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const { t } = useLang();
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const up = await uploadFile(token, file);
+      onChange(up.id);
+      setName(up.name);
+      setNote(up.hasText ? null : t('run_file_no_text'));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('error_generic'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div>
+      <input ref={inputRef} type="file" id={`f-${field.key}`} accept={field.accept} className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} disabled={disabled || busy} />
+      {value && name ? (
+        <div className="flex items-center gap-3 rounded-xl bg-jade-2 px-3 py-2.5 hairline">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-jade-12 text-white"><Icon name="paperclip" size={15} /></span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-jade-12">{name}</span>
+          <Button size="sm" variant="ghost" onClick={() => { onChange(''); setName(''); setNote(null); if (inputRef.current) inputRef.current.value = ''; }} disabled={disabled}>{t('run_file_remove')}</Button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={disabled || busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-sand-6 bg-sand-1 px-3 py-4 text-[13.5px] font-semibold text-sand-10 transition hover:border-jade-7 hover:bg-jade-1 hover:text-jade-11 disabled:opacity-50">
+          {busy ? <><Icon name="loader" size={16} /> {t('run_file_uploading')}</> : <><Icon name="paperclip" size={16} /> {t('run_file_pick')}</>}
+        </button>
+      )}
+      {note && <p className="mt-1 text-xs text-amber-11">{note}</p>}
+      {err && <p className="mt-1 text-xs text-coral-11" role="alert">{err}</p>}
     </div>
   );
 }

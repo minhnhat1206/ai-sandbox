@@ -14,11 +14,12 @@ export function apiPlugin(): Plugin {
       const { Store } = await import('./store.ts');
       const { createProvider } = await import('./providers/index.ts');
       const { createApp } = await import('./app.ts');
+      const { UploadStore } = await import('./uploads.ts');
       loadDotEnv();
       const config = readConfig();
       const store = new Store(config.dataDir);
       const provider = createProvider(config);
-      const app = createApp({ store, provider, config });
+      const app = createApp({ store, provider, config, uploads: new UploadStore(`${config.dataDir}/uploads`), filesDir: `${config.dataDir}/artifacts` });
       const listener = getRequestListener(app.fetch);
       console.log(`  ➜  API: provider=${provider.name} model=${provider.model}${config.adminTokenIsDefault ? '  (ADMIN_TOKEN is the default: change it before sharing links)' : ''}`);
       server.middlewares.use((req, res, next) => {

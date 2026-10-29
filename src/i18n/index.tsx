@@ -2,11 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { L, Lang } from '@shared/types';
 import { DICT, type DictKey } from './dict';
 
+/** A dynamic key (e.g. `tool_${name}`) that may not exist in the dictionary. */
+export type DictKeyLoose = string & { readonly __loose?: never };
+
 interface LangCtx {
   lang: Lang;
   setLang: (l: Lang) => void;
-  /** Translate a dictionary key with optional {placeholders}. */
-  t: (key: DictKey, vars?: Record<string, string | number>) => string;
+  /** Translate a dictionary key with optional {placeholders}; unknown keys fall back to `fallback` (or the key). */
+  t: (key: DictKey | DictKeyLoose, vars?: Record<string, string | number>, fallback?: string) => string;
   /** Pick the current language from a bilingual object. */
   pick: (l: L) => string;
 }
@@ -34,8 +37,8 @@ export function LangProvider({ children, initial }: { children: ReactNode; initi
   const value = useMemo<LangCtx>(() => ({
     lang,
     setLang,
-    t: (key, vars) => {
-      let s = DICT[key]?.[lang] ?? key;
+    t: (key, vars, fallback) => {
+      let s = (DICT as Record<string, L>)[key]?.[lang] ?? fallback ?? key;
       if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
       return s;
     },

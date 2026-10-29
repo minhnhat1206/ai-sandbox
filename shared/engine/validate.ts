@@ -3,6 +3,8 @@ import { WORKFLOW_ICONS } from '../icons.ts';
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const CATEGORIES = new Set(['operations', 'sales', 'marketing', 'finance', 'hr', 'customer-service', 'general']);
+const TOOLS = new Set(['query_records', 'aggregate_records', 'search_knowledge', 'create_ticket', 'draft_email', 'calculate', 'create_artifact', 'web_search']);
+const SKILLS = new Set(['xlsx', 'docx', 'pptx', 'pdf']);
 
 function isL(v: unknown): v is { vi: string; en: string } {
   return !!v && typeof v === 'object' && typeof (v as { vi?: unknown }).vi === 'string' && typeof (v as { en?: unknown }).en === 'string'
@@ -40,7 +42,8 @@ export function validateWorkflow(wf: unknown): string[] {
       else if (keys.has(f.key)) at(`inputs[${i}].key "${f.key}" is duplicated`);
       else keys.add(f.key);
       if (!isL(f.label)) at(`inputs[${i}].label must have vi and en`);
-      if (!['text', 'textarea', 'select', 'number'].includes(f.type)) at(`inputs[${i}].type is invalid`);
+      if (!['text', 'textarea', 'select', 'number', 'file'].includes(f.type)) at(`inputs[${i}].type is invalid`);
+      if (f.type === 'file' && f.required) at(`inputs[${i}] file inputs must be optional (pair them with a textarea sample so the 2-click demo works)`);
       if (typeof f.sample !== 'string') at(`inputs[${i}].sample is required (string) so first-time users can run with one click`);
       if (f.type === 'select') {
         if (!Array.isArray(f.options) || f.options.length === 0) at(`inputs[${i}] select needs options`);
@@ -62,6 +65,15 @@ export function validateWorkflow(wf: unknown): string[] {
         if (!isL(s.title)) at(`steps[${i}].title must have vi and en`);
         if (typeof s.system !== 'string' || !s.system.trim()) at(`steps[${i}].system is required`);
         if (typeof s.prompt !== 'string' || !s.prompt.trim()) at(`steps[${i}].prompt is required`);
+        if (s.agent !== undefined) {
+          if (!s.agent || typeof s.agent !== 'object' || !Array.isArray(s.agent.tools) || s.agent.tools.length === 0) at(`steps[${i}].agent.tools must be a non-empty list`);
+          else {
+            for (const tname of s.agent.tools) if (!TOOLS.has(tname)) at(`steps[${i}].agent uses unknown tool "${tname}"`);
+            if (s.agent.skills) for (const sk of s.agent.skills) if (!SKILLS.has(sk)) at(`steps[${i}].agent uses unknown skill "${sk}"`);
+            if (s.agent.skills?.length && s.agent.tools.includes('web_search')) at(`steps[${i}].agent cannot combine web_search with skills (both need code execution)`);
+            if (s.agent.maxTurns !== undefined && (typeof s.agent.maxTurns !== 'number' || s.agent.maxTurns < 1 || s.agent.maxTurns > 20)) at(`steps[${i}].agent.maxTurns must be 1-20`);
+          }
+        }
         // Referenced variables must exist.
         const refs = `${s.system}\n${s.prompt}`.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g);
         for (const m of refs) {

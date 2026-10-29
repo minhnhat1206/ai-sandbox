@@ -12,6 +12,10 @@ Goal: a `WorkflowDef` in `shared/catalog/<category>.ts`, registered in
 1. **Clarify the job** (ask only if truly unclear): who runs it, what they paste in,
    what they expect out, how long it takes them by hand today (`minutesSavedPerRun`).
 2. **Pick kind**: `form` for input → deliverable; `chat` for open Q&A over documents.
+   **Make it an agent** (`agent: { tools }`) whenever the job needs company data
+   (`query_records`/`aggregate_records`), documents (`search_knowledge`), actions
+   (`create_ticket`/`draft_email`), deliverables (`create_artifact`), web facts (`web_search`)
+   or real office files (`skills: ['xlsx']`). Use `AGENT_RULES` from `shared/catalog/agents.ts`.
 3. **Design inputs** (1–4): `textarea` for pasted content, `select` for tone/audience.
    Write a realistic Vietnamese `sample` for every input (a real-looking email, table,
    meeting note). Required fields only where the output is meaningless without them.
@@ -23,11 +27,14 @@ Goal: a `WorkflowDef` in `shared/catalog/<category>.ts`, registered in
 6. **Register** in `CATALOG` (gallery order = most impressive first).
 7. **Validate and test**: `npm run validate:catalog && npm run test`. The catalog test
    checks samples pass validation.
-8. **Demo quality**: run it in the UI with the mock provider (`npm run dev`, open
+8. **Agent mock**: for an agent step, add a script in `server/providers/mock-agents.ts`
+   that calls the real tools on the seed data and narrates in VI/EN; add a test in
+   `tests/agents.test.ts`.
+9. **Demo quality**: run it in the UI with the mock provider (`npm run dev`, open
    `/s/demo`, enable it in the admin "Quy trình" tab if needed). If the generic mock
    output looks wrong for a sales demo, add a renderer case in
    `server/providers/mock.ts` keyed `"<id>/<stepId>"`.
-9. Report: id, category, inputs, minutes saved, and what the demo output looks like.
+10. Report: id, category, inputs, minutes saved, and what the demo output looks like.
 
 ## Template
 ```ts

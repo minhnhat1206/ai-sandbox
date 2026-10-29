@@ -1,5 +1,6 @@
 import type { Workspace } from '../shared/types.ts';
 import { nowIso } from './ids.ts';
+import { demoDataSources } from './seed-data.ts';
 
 /** A ready-to-show demo sandbox so the platform works on first start. */
 export function demoWorkspace(): Workspace {
@@ -14,14 +15,18 @@ export function demoWorkspace(): Workspace {
     language: 'vi',
     brief: `Headquarters (Singapore) is pushing AI adoption. Staff already use ChatGPT on personal accounts for emails and reports. Main pains: slow customer-service replies, weekly reports take managers half a day, HR answers the same policy questions all week. They want to see what "AI connected to our documents" looks like before buying anything.`,
     workflowIds: [
+      'order-care-agent',
+      'receivables-agent',
+      'weekly-ops-agent',
+      'inventory-agent',
+      'meeting-prep-agent',
+      'document-review',
+      'data-cleanup',
+      'excel-builder',
       'company-assistant',
-      'customer-reply',
-      'weekly-report',
-      'meeting-actions',
       'policy-assistant',
+      'customer-reply',
       'invoice-extract',
-      'data-insight',
-      'sales-outreach',
     ],
     overrides: {},
     customWorkflows: [],
@@ -47,6 +52,8 @@ export function demoWorkspace(): Workspace {
         updatedAt: ts,
       },
     ],
+    dataSources: demoDataSources(ts),
+    mcpServers: [],
     credits: { total: 100, used: 0 },
     status: 'active',
     notes: 'Demo sandbox created automatically. Safe to edit or delete.',

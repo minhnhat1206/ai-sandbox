@@ -3,9 +3,11 @@ import { dataInsight, meetingNotes, weeklyReport } from './operations.ts';
 import { salesOutreach, socialPost } from './sales.ts';
 import { customerReply, generalAssistant, policyAssistant } from './customer-service.ts';
 import { invoiceExtract, jobDescription, translateLocalize } from './hr-finance.ts';
+import { AGENT_WORKFLOWS } from './agents.ts';
 
 /** Every workflow template we can enable in a sandbox. Order = gallery order. */
 export const CATALOG: WorkflowDef[] = [
+  ...AGENT_WORKFLOWS,
   generalAssistant,
   customerReply,
   weeklyReport,

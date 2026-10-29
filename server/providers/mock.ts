@@ -1,5 +1,6 @@
 import type { Lang } from '../../shared/types.ts';
-import type { CompletionRequest, CompletionResult, Provider } from './types.ts';
+import { runMockAgent } from './mock-agents.ts';
+import type { AgentHooks, AgentRequest, CompletionRequest, CompletionResult, Provider } from './types.ts';
 
 /**
  * Deterministic demo provider. Runs with zero keys so the whole platform can be
@@ -24,6 +25,12 @@ export class MockProvider implements Provider {
       if (this.delayMs > 0) await new Promise((r) => setTimeout(r, this.delayMs));
     }
     return { text, inputTokens, outputTokens: Math.ceil(text.length / 4) };
+  }
+
+  async runAgent(req: AgentRequest, hooks: AgentHooks, signal?: AbortSignal): Promise<CompletionResult> {
+    const text = await runMockAgent(req, hooks, this.delayMs, signal);
+    const inputTokens = Math.ceil((req.system.length + req.messages.reduce((n, m) => n + m.content.length, 0)) / 4);
+    return { text, inputTokens, outputTokens: Math.ceil(text.length / 4) + 400 };
   }
 
   async completeText(_system: string, user: string): Promise<string> {

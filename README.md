@@ -20,7 +20,16 @@ npm run dev
 - Admin console: http://localhost:3000/admin (password `change-me` until you set `ADMIN_TOKEN`)
 
 Without any API key the platform runs in **demo mode** (mock provider): every screen and
-flow works, output is simulated and labelled as such.
+flow works. Agent workflows still run the real tools (queries, aggregations, tickets,
+artifacts) against the sample data; only the narration is scripted, and it is labelled.
+
+## What prospects can try
+
+- **Agents** that look up their data (CSV tables we connect, or real MCP servers with
+  Claude), check company documents, open tickets, draft emails and publish deliverables:
+  HTML dashboards, tables, CSV, markdown, and real `.xlsx` files through Agent Skills.
+- **File inputs**: PDF, images, CSV and text (contract review, data clean-up).
+- Full transparency: a timeline of every tool call, the artifacts, and the actions taken.
 
 ### Connect real Claude
 

@@ -7,3 +7,6 @@ export const COMPANY_CONTEXT = `You are working for {{company}} ({{industry}}). 
 
 export const KNOWLEDGE_BLOCK = `Company documents you may rely on (quote them when relevant, never invent policy that is not here):
 {{knowledge}}`;
+
+/** Variable filled by the runner with the connected data-source catalogue (agent steps). */
+export const SOURCES_VAR = '{{sources}}';

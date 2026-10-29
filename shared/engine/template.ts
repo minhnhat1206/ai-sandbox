@@ -9,6 +9,8 @@ export interface TemplateContext {
   brief: string;
   lang: Lang;
   language: string;
+  /** Connected data-source catalogue for agent prompts. */
+  sources?: string;
 }
 
 const LANGUAGE_NAME: Record<Lang, string> = { vi: 'Vietnamese (Tiếng Việt)', en: 'English' };
@@ -43,6 +45,8 @@ export function renderTemplate(template: string, ctx: TemplateContext): string {
         return ctx.lang;
       case 'language':
         return ctx.language;
+      case 'sources':
+        return ctx.sources ?? '(no connected data sources)';
       default:
         return '';
     }
@@ -86,6 +90,9 @@ export function validateInputs(fields: InputField[], input: Record<string, strin
     if (f.required && !v) {
       errors.push({ key: f.key, message: { vi: `Vui lòng nhập "${f.label.vi}"`, en: `Please fill in "${f.label.en}"` } });
       continue;
+    }
+    if (v && f.type === 'file' && !/^upl_[a-z0-9]+$/.test(v)) {
+      errors.push({ key: f.key, message: { vi: `Tệp "${f.label.vi}" chưa được tải lên`, en: `File "${f.label.en}" was not uploaded` } });
     }
     if (v && f.type === 'number' && Number.isNaN(Number(v))) {
       errors.push({ key: f.key, message: { vi: `"${f.label.vi}" phải là số`, en: `"${f.label.en}" must be a number` } });

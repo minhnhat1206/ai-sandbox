@@ -22,7 +22,28 @@ export type WorkflowCategory =
   | 'customer-service'
   | 'general';
 
-export type InputType = 'text' | 'textarea' | 'select' | 'number';
+export type InputType = 'text' | 'textarea' | 'select' | 'number' | 'file';
+
+/** Server-side tools an agent step may call (see server/tools). */
+export type ToolName =
+  | 'query_records'
+  | 'aggregate_records'
+  | 'search_knowledge'
+  | 'create_ticket'
+  | 'draft_email'
+  | 'calculate'
+  | 'create_artifact'
+  | 'web_search';
+
+/** Anthropic Agent Skills (real provider): produce real office files. */
+export type SkillName = 'xlsx' | 'docx' | 'pptx' | 'pdf';
+
+export interface AgentSpec {
+  tools: ToolName[];
+  skills?: SkillName[];
+  /** Max model turns (tool rounds). Default 8. */
+  maxTurns?: number;
+}
 
 export interface InputField {
   key: string;
@@ -35,6 +56,8 @@ export interface InputField {
   /** Pre-filled example so a nervous first-time user can just press Run. */
   sample: string;
   rows?: number;
+  /** For type = 'file': accepted extensions, e.g. ".pdf,.csv,.txt". */
+  accept?: string;
 }
 
 export interface WorkflowStep {
@@ -45,6 +68,8 @@ export interface WorkflowStep {
   /** User prompt template. Variables: {{input.key}}, {{steps.id}}, {{knowledge}}, {{company}}, {{lang}}, {{language}} */
   prompt: string;
   maxTokens?: number;
+  /** When set, the step runs as an agent loop with these tools instead of a single completion. */
+  agent?: AgentSpec;
 }
 
 export interface WorkflowDef {
@@ -71,6 +96,23 @@ export interface WorkflowDef {
     starters: L[];
     greeting: L;
   };
+}
+
+/** A CSV table the prospect "connected" (pasted by us). Agents query it like a system of record. */
+export interface DataSource {
+  id: string;
+  name: string;
+  description: string;
+  csv: string;
+  updatedAt: string;
+}
+
+/** A remote MCP server the real provider may call through the Anthropic MCP connector. */
+export interface McpServer {
+  id: string;
+  name: string;
+  url: string;
+  authToken?: string;
 }
 
 export interface KnowledgeDoc {
@@ -100,6 +142,8 @@ export interface Workspace {
   /** Workflows authored specifically for this prospect (not in the catalog). */
   customWorkflows: WorkflowDef[];
   knowledge: KnowledgeDoc[];
+  dataSources: DataSource[];
+  mcpServers: McpServer[];
   credits: { total: number; used: number };
   status: WorkspaceStatus;
   notes: string;
@@ -118,6 +162,55 @@ export interface WorkflowOverride {
 }
 
 export type RunStatus = 'running' | 'done' | 'error';
+
+export type ArtifactKind = 'html' | 'table' | 'markdown' | 'csv' | 'json' | 'file';
+
+export interface Artifact {
+  id: string;
+  kind: ArtifactKind;
+  title: string;
+  /** html / markdown / csv / json text content. */
+  content?: string;
+  /** For kind = 'table'. */
+  columns?: string[];
+  rows?: Record<string, string | number | boolean | null>[];
+  /** For kind = 'file' (downloaded from the provider, stored on disk). */
+  filename?: string;
+  mime?: string;
+  size?: number;
+}
+
+export type ActionType = 'ticket' | 'email';
+
+/** Something the agent "did" in a connected system. Simulated in the sandbox: nothing leaves the server. */
+export interface Action {
+  id: string;
+  type: ActionType;
+  summary: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ToolCall {
+  id: string;
+  stepId: string;
+  tool: string;
+  input: unknown;
+  output?: string;
+  isError?: boolean;
+  startedAt: string;
+  durationMs?: number;
+}
+
+export interface UploadMeta {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  /** Extracted text when available (txt/csv/md/pdf). */
+  text?: string;
+  createdAt: string;
+}
 
 export interface RunStepResult {
   id: string;
@@ -149,6 +242,9 @@ export interface Run {
   outputTokens: number;
   costUsd: number;
   minutesSaved: number;
+  trace: ToolCall[];
+  artifacts: Artifact[];
+  actions: Action[];
   rating?: 1 | 2 | 3 | 4 | 5;
   feedback?: string;
   startedAt: string;
@@ -178,6 +274,8 @@ export interface SandboxView {
   workspace: Pick<Workspace, 'id' | 'token' | 'company' | 'industry' | 'language' | 'status' | 'brief' | 'expiresAt'>;
   workflows: WorkflowDef[];
   knowledgeTitles: string[];
+  dataSources: { id: string; name: string; description: string; rows: number; columns: string[] }[];
+  connectors: string[];
   creditsRemaining: number;
   creditsTotal: number;
   provider: { name: string; model: string; isDemo: boolean };
@@ -189,6 +287,10 @@ export type RunEvent =
   | { type: 'step.started'; stepId: string; title: L; index: number; total: number }
   | { type: 'step.delta'; stepId: string; text: string }
   | { type: 'step.done'; stepId: string }
+  | { type: 'tool.call'; call: ToolCall }
+  | { type: 'tool.result'; id: string; output: string; isError: boolean; durationMs: number }
+  | { type: 'artifact'; artifact: Artifact }
+  | { type: 'action'; action: Action }
   | { type: 'run.done'; run: Run; creditsRemaining: number }
   | { type: 'error'; message: string; code?: string };
 

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { validateWorkflow } from '@shared/engine/validate';
-import type { KnowledgeDoc, Lang, Lead, Run, WorkflowDef, WorkflowOverride, Workspace, WorkspaceStatus } from '@shared/types';
+import { parseCsv } from '@shared/engine/csv';
+import type { DataSource, KnowledgeDoc, Lang, Lead, McpServer, Run, WorkflowDef, WorkflowOverride, Workspace, WorkspaceStatus } from '@shared/types';
+import { ActionsPanel, ArtifactsPanel } from '@/components/AgentPanel';
 import { Alert, Badge, Button, Card, Field, IconTile, Input, Select, Skeleton, Stars, Tabs, Textarea, useToast } from '@/components/ui';
 import { Icon } from '@/icons';
 import { useLang } from '@/i18n';
 import { adminApi } from '@/lib/api';
 import { Markdown } from '@/lib/markdown';
 
-type Tab = 'general' | 'workflows' | 'knowledge' | 'custom' | 'activity';
+type Tab = 'general' | 'workflows' | 'knowledge' | 'data' | 'connectors' | 'custom' | 'activity';
 const STATUS_TONE = { draft: 'neutral', active: 'success', converted: 'brand', archived: 'warn' } as const;
 
 export default function WorkspaceEditor() {
@@ -50,6 +52,8 @@ export default function WorkspaceEditor() {
     { id: 'general', label: t('ad_tab_general'), icon: 'building' },
     { id: 'workflows', label: t('ad_tab_workflows'), icon: 'grid', count: ws.workflowIds.length },
     { id: 'knowledge', label: t('ad_tab_knowledge'), icon: 'book', count: ws.knowledge.length },
+    { id: 'data', label: t('ad_tab_data'), icon: 'Table', count: ws.dataSources?.length ?? 0 },
+    { id: 'connectors', label: t('ad_tab_connectors'), icon: 'Globe', count: ws.mcpServers?.length ?? 0 },
     { id: 'custom', label: t('ad_tab_custom'), icon: 'Wand2', count: ws.customWorkflows.length },
     { id: 'activity', label: t('ad_tab_activity'), icon: 'bolt' },
   ];
@@ -77,6 +81,8 @@ export default function WorkspaceEditor() {
         {tab === 'general' && <GeneralTab ws={ws} onSave={save} saving={saving} />}
         {tab === 'workflows' && <WorkflowsTab ws={ws} catalog={catalog} onSave={save} />}
         {tab === 'knowledge' && <KnowledgeTab ws={ws} onSave={save} saving={saving} />}
+        {tab === 'data' && <DataTab ws={ws} onSave={save} saving={saving} />}
+        {tab === 'connectors' && <ConnectorsTab ws={ws} onSave={save} saving={saving} />}
         {tab === 'custom' && <CustomTab ws={ws} onSave={save} lang={lang} />}
         {tab === 'activity' && <ActivityTab ws={ws} pick={pick} />}
       </div>
@@ -239,6 +245,69 @@ function KnowledgeTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Recor
   );
 }
 
+function DataTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
+  const { t } = useLang();
+  const [list, setList] = useState<Pick<DataSource, 'id' | 'name' | 'description' | 'csv'>[]>(ws.dataSources ?? []);
+  const [preview, setPreview] = useState<number | null>(null);
+  const upd = (i: number, patch: Partial<DataSource>) => setList(list.map((d, n) => (n === i ? { ...d, ...patch } : d)));
+  return (
+    <div className="space-y-3">
+      <Alert tone="info" icon="Table">{t('ad_ds_hint')}</Alert>
+      {list.map((d, i) => {
+        const parsed = preview === i ? parseCsv(d.csv) : null;
+        return (
+          <Card key={i} className="space-y-3 p-4">
+            <div className="flex flex-wrap gap-2">
+              <IconTile name="Table" size="sm" />
+              <Input value={d.name} placeholder={t('ad_ds_name')} onChange={(e) => upd(i, { name: e.target.value })} aria-label={t('ad_ds_name')} className="font-mono sm:max-w-[200px]" />
+              <Input value={d.description} placeholder={t('ad_ds_desc')} onChange={(e) => upd(i, { description: e.target.value })} aria-label={t('ad_ds_desc')} className="flex-1" />
+              <Button variant="ghost" size="sm" onClick={() => setList(list.filter((_, n) => n !== i))} aria-label={t('delete')} className="text-coral-11"><Icon name="trash" size={16} /></Button>
+            </div>
+            <Textarea rows={7} value={d.csv} placeholder={t('ad_ds_csv')} onChange={(e) => upd(i, { csv: e.target.value })} aria-label={t('ad_ds_csv')} className="font-mono text-[12px]" />
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-sand-9 tnum">{d.csv.split(/\r?\n/).filter(Boolean).length - 1} {t('sb_rows')} · {d.csv.length.toLocaleString()} chars</p>
+              <Button size="sm" variant="ghost" icon="search" onClick={() => setPreview(preview === i ? null : i)}>{t('ad_ds_preview')}</Button>
+            </div>
+            {parsed && (
+              <div className="max-h-64 overflow-auto rounded-xl hairline animate-fade">
+                <table className="w-full text-[12px]"><thead className="sticky top-0 bg-sand-3"><tr>{parsed.columns.map((c) => <th key={c} className="px-2 py-1.5 text-left font-semibold text-sand-11">{c}</th>)}</tr></thead>
+                  <tbody>{parsed.rows.slice(0, 20).map((r, n) => <tr key={n} className="border-t border-sand-4">{parsed.columns.map((c) => <td key={c} className="px-2 py-1 tnum">{r[c]}</td>)}</tr>)}</tbody></table>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+      <div className="flex justify-between">
+        <Button variant="secondary" onClick={() => setList([...list, { id: '', name: '', description: '', csv: '' }])} icon="plus">{t('ad_ds_add')}</Button>
+        <Button onClick={() => onSave({ dataSources: list.filter((d) => d.name.trim() && d.csv.trim()) })} loading={saving} icon="check">{t('save')}</Button>
+      </div>
+    </div>
+  );
+}
+
+function ConnectorsTab({ ws, onSave, saving }: { ws: Workspace; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
+  const { t } = useLang();
+  const [list, setList] = useState<McpServer[]>(ws.mcpServers ?? []);
+  const upd = (i: number, patch: Partial<McpServer>) => setList(list.map((d, n) => (n === i ? { ...d, ...patch } : d)));
+  return (
+    <div className="space-y-3">
+      <Alert tone="info" icon="Globe">{t('ad_mcp_hint')}</Alert>
+      {list.map((m, i) => (
+        <Card key={i} className="grid gap-2 p-4 sm:grid-cols-[160px_1fr_1fr_auto]">
+          <Input value={m.name} placeholder={t('ad_mcp_name')} onChange={(e) => upd(i, { name: e.target.value })} aria-label={t('ad_mcp_name')} className="font-mono" />
+          <Input value={m.url} placeholder={t('ad_mcp_url')} onChange={(e) => upd(i, { url: e.target.value })} aria-label={t('ad_mcp_url')} className="font-mono" />
+          <Input value={m.authToken ?? ''} type="password" placeholder={t('ad_mcp_token')} onChange={(e) => upd(i, { authToken: e.target.value })} aria-label={t('ad_mcp_token')} />
+          <Button variant="ghost" size="sm" onClick={() => setList(list.filter((_, n) => n !== i))} aria-label={t('delete')} className="text-coral-11"><Icon name="trash" size={16} /></Button>
+        </Card>
+      ))}
+      <div className="flex justify-between">
+        <Button variant="secondary" onClick={() => setList([...list, { id: '', name: '', url: '' }])} icon="plus">{t('ad_mcp_add')}</Button>
+        <Button onClick={() => onSave({ mcpServers: list.filter((m) => m.name.trim() && m.url.trim()) })} loading={saving} icon="check">{t('save')}</Button>
+      </div>
+    </div>
+  );
+}
+
 function CustomTab({ ws, onSave, lang }: { ws: Workspace; onSave: (p: Record<string, unknown>) => Promise<void>; lang: Lang }) {
   const { t, pick } = useLang();
   const [brief, setBrief] = useState('');
@@ -356,6 +425,11 @@ function ActivityTab({ ws, pick }: { ws: Workspace; pick: (l: { vi: string; en: 
             <pre className="whitespace-pre-wrap rounded-lg bg-white p-3 font-mono text-[12px]">{JSON.stringify(open.inputs, null, 2)}</pre>
             <p className="eyebrow mb-2 mt-4">Output</p>
             <div className="paper rounded-lg p-4"><Markdown text={open.output || open.error || ''} /></div>
+            {(open.trace?.length ?? 0) > 0 && <p className="mt-3 text-[12px] text-sand-9">{open.trace.length} tool calls · {open.trace.map((c) => c.tool).join(', ')}</p>}
+            <div className="mt-4 space-y-4">
+              <ArtifactsPanel artifacts={open.artifacts ?? []} urlFor={(a, d) => `/api/sandbox/${encodeURIComponent(ws.token)}/runs/${open.id}/artifacts/${a.id}${d ? '?download' : ''}`} />
+              <ActionsPanel actions={open.actions ?? []} />
+            </div>
           </div>
         )}
       </Card>

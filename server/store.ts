@@ -10,6 +10,14 @@ export interface DB {
   leads: Lead[];
 }
 
+/** Fill fields added after the first release so older db.json files keep working. */
+function migrateWorkspace(ws: Workspace): Workspace {
+  return { ...ws, dataSources: ws.dataSources ?? [], mcpServers: ws.mcpServers ?? [], customWorkflows: ws.customWorkflows ?? [], knowledge: ws.knowledge ?? [], overrides: ws.overrides ?? {} };
+}
+function migrateRun(run: Run): Run {
+  return { ...run, trace: run.trace ?? [], artifacts: run.artifacts ?? [], actions: run.actions ?? [] };
+}
+
 function emptyDb(): DB {
   return { version: 1, workspaces: [demoWorkspace()], runs: [], leads: [] };
 }
@@ -35,8 +43,8 @@ export class Store {
       const parsed = JSON.parse(fs.readFileSync(this.file, 'utf8')) as Partial<DB>;
       return {
         version: 1,
-        workspaces: parsed.workspaces ?? [],
-        runs: parsed.runs ?? [],
+        workspaces: (parsed.workspaces ?? []).map(migrateWorkspace),
+        runs: (parsed.runs ?? []).map(migrateRun),
         leads: parsed.leads ?? [],
       };
     } catch (err) {

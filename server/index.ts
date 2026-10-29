@@ -6,12 +6,13 @@ import { createApp } from './app.ts';
 import { loadDotEnv, readConfig } from './config.ts';
 import { createProvider } from './providers/index.ts';
 import { Store } from './store.ts';
+import { UploadStore } from './uploads.ts';
 
 loadDotEnv();
 const config = readConfig();
 const store = new Store(config.dataDir);
 const provider = createProvider(config);
-const app = createApp({ store, provider, config });
+const app = createApp({ store, provider, config, uploads: new UploadStore(`${config.dataDir}/uploads`), filesDir: `${config.dataDir}/artifacts` });
 
 // Serve the built SPA from dist/ with history fallback.
 const dist = path.resolve(process.cwd(), 'dist');

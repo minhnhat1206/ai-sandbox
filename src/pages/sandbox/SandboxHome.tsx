@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { WorkflowCategory } from '@shared/types';
+import { CAP_ICON, capabilitiesOf } from '@/components/AgentPanel';
 import { Badge, Button, IconTile, Input, Modal } from '@/components/ui';
 import { Icon } from '@/icons';
-import { useLang } from '@/i18n';
+import { useLang, type DictKeyLoose } from '@/i18n';
 import { getVisitorName, setVisitorName } from '@/lib/api';
 import { useSandbox } from './context';
 
@@ -53,6 +54,13 @@ export default function SandboxHome() {
               {view.knowledgeTitles.map((k) => <span key={k} className="rounded-full bg-white/10 px-2.5 py-0.5 text-[12px] font-medium text-white ring-1 ring-white/15">{k}</span>)}
             </div>
           )}
+          {(view.dataSources.length > 0 || view.connectors.length > 0) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-white/70">
+              <Icon name="Table" size={16} className="text-amber-6" /> {t('sb_data_connected')}
+              {view.dataSources.map((d) => <span key={d.id} className="rounded-full bg-white/10 px-2.5 py-0.5 font-mono text-[11.5px] font-medium text-white ring-1 ring-white/15" title={d.description}>{d.name} · {d.rows} {t('sb_rows')}</span>)}
+              {view.connectors.map((c) => <span key={c} className="rounded-full bg-amber-9/30 px-2.5 py-0.5 font-mono text-[11.5px] font-medium text-white ring-1 ring-amber-6/40">MCP · {c}</span>)}
+            </div>
+          )}
         </div>
       </section>
 
@@ -83,6 +91,11 @@ export default function SandboxHome() {
               <h2 className="mt-4 text-[17px] font-bold tracking-tight text-jade-12">{pick(w.name)}</h2>
               <p className="mt-1 text-[13.5px] font-medium text-jade-10">{pick(w.tagline)}</p>
               <p className="mt-2 flex-1 text-[14px] leading-relaxed text-sand-10">{pick(w.description)}</p>
+              {capabilitiesOf(w, view.connectors.length).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {capabilitiesOf(w, view.connectors.length).map((c) => <span key={c} className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold ${c === 'cap_agent' ? 'bg-jade-12 text-white' : 'bg-jade-3 text-jade-11'}`}><Icon name={CAP_ICON[c]} size={11} /> {t(c as DictKeyLoose)}</span>)}
+                </div>
+              )}
               <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-sand-9">
                 <span className="inline-flex items-center gap-1"><Icon name="clock" size={13} /> {t('sb_saves', { n: w.minutesSavedPerRun })}</span>
                 {w.kind === 'form' && w.steps.length > 1 && <span className="inline-flex items-center gap-1"><Icon name="ListChecks" size={13} /> {t('sb_steps', { n: w.steps.length })}</span>}

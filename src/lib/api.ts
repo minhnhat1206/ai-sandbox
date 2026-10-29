@@ -92,6 +92,16 @@ export async function streamRun(
   }
 }
 
+/** Upload a file for a `file` input; returns the upload id to place in the inputs map. */
+export async function uploadFile(token: string, file: File): Promise<{ id: string; name: string; mime: string; size: number; hasText: boolean }> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`/api/sandbox/${encodeURIComponent(token)}/uploads`, { method: 'POST', body: form });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; upload?: { id: string; name: string; mime: string; size: number; hasText: boolean } };
+  if (!res.ok || !body.upload) throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
+  return body.upload;
+}
+
 // ---- admin -------------------------------------------------------------------------------
 const ADMIN_KEY = 'sandbox.adminToken';
 export function getAdminToken(): string {

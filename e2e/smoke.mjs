@@ -73,8 +73,42 @@ try {
   check(await page.locator('text=/Đặt lịch trao đổi|Book a call/').first().isVisible(), 'conversion CTA visible after run');
   await page.screenshot({ path: path.join(shots, '03-run-result.png'), fullPage: true });
 
+  // agent workflow: tool timeline, deliverables, actions
+  await page.goto(`${base}/s/demo/run/order-care-agent`);
+  await page.getByRole('button', { name: /Dùng dữ liệu mẫu|Use sample data/ }).click();
+  await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
+  await page.waitForSelector('text=/Kết quả demo|Demo result/', { timeout: 60000 });
+  await page.waitForSelector('text=/Agent đã làm gì|What the agent did/', { timeout: 10000 });
+  const toolRows = await page.locator('ol li button:has-text("ms")').count();
+  check(toolRows >= 5, `agent timeline shows ${toolRows} tool calls`);
+  check(await page.locator('text=/Sản phẩm bàn giao|Deliverables/').first().isVisible(), 'deliverables panel visible');
+  check(await page.locator('text=/Hành động đã thực hiện|Actions taken/').first().isVisible(), 'actions panel visible');
+  check((await page.locator('text=/^TK-[A-Z0-9]+$/').count()) >= 1, 'ticket id shown');
+  await page.screenshot({ path: path.join(shots, '03b-agent-run.png'), fullPage: true });
+
+  // agent with HTML dashboard artifact rendered in an iframe
+  await page.goto(`${base}/s/demo/run/receivables-agent`);
+  await page.getByRole('button', { name: /Dùng dữ liệu mẫu|Use sample data/ }).click();
+  await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
+  await page.waitForSelector('text=/Kết quả demo|Demo result/', { timeout: 60000 });
+  await page.waitForSelector('iframe[title="Receivables dashboard"]', { timeout: 10000 });
+  const frame = page.frameLocator('iframe[title="Receivables dashboard"]');
+  await frame.locator('svg').first().waitFor({ timeout: 10000 });
+  check(true, 'HTML dashboard artifact renders with an inline SVG chart');
+  await page.getByRole('tab', { name: /Call list/ }).click();
+  check((await page.locator('table').last().locator('tr').count()) > 3, 'table artifact renders rows');
+  await page.screenshot({ path: path.join(shots, '03c-agent-dashboard.png'), fullPage: true });
+
+  // file upload into a document review
+  await page.goto(`${base}/s/demo/run/document-review`);
+  await page.locator('#f-file').setInputFiles({ name: 'hop-dong.txt', mimeType: 'text/plain', buffer: Buffer.from('Điều 1. Giao hàng: phạt 0,5%/ngày tối đa 10%.\nĐiều 2. Độc quyền 12 tháng sau khi chấm dứt.') });
+  await page.waitForSelector('text=hop-dong.txt', { timeout: 10000 });
+  await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
+  await page.waitForSelector('text=/Kết quả demo|Demo result/', { timeout: 60000 });
+  check(await page.getByRole('tab', { name: /Clause review/ }).isVisible(), 'uploaded file reviewed into a clause table');
+
   // validation error path
-  await page.goto(`${base}/s/demo/run/weekly-report`);
+  await page.goto(`${base}/s/demo/run/customer-reply`);
   await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
   check(await page.getByRole('alert').first().isVisible(), 'validation error shown for empty required field');
 
@@ -91,7 +125,7 @@ try {
   await page.waitForSelector('text=/Kết quả của tôi|My results/');
   await page.waitForTimeout(500);
   const runRows = await page.locator('button:has-text("Xem"), button:has-text("View")').count();
-  check(runRows >= 2, `results page lists ${runRows} runs`);
+  check(runRows >= 5, `results page lists ${runRows} runs`);
   await page.screenshot({ path: path.join(shots, '05-results.png') });
 
   // lead form
@@ -134,6 +168,14 @@ try {
   check(true, 'agent-drafted custom workflow saved');
   await page.screenshot({ path: path.join(shots, '07-admin-custom.png'), fullPage: true });
 
+  await page.getByRole('tab', { name: /Dữ liệu kết nối|Connected data/ }).click();
+  await page.getByRole('button', { name: /Thêm bảng|Add table/ }).click();
+  await page.getByLabel(/Tên bảng|Table name/).last().fill('products');
+  await page.getByLabel(/Nội dung CSV|CSV content/).last().fill('sku,name,price\nA1,Gạo,120000\nB2,Dầu,41000');
+  await page.getByRole('button', { name: /^(Lưu|Save)$/ }).click();
+  await page.waitForSelector('text=/Đã lưu|Saved/');
+  check(true, 'data source saved');
+
   await page.getByRole('tab', { name: /Tài liệu|Documents/ }).click();
   await page.getByRole('button', { name: /Thêm tài liệu|Add document/ }).click();
   await page.getByLabel(/Tiêu đề|Title/).last().fill('Quy định');
@@ -147,6 +189,7 @@ try {
   await page.waitForSelector('text=Công ty Smoke');
   if (await page.getByRole('dialog').isVisible()) await page.getByRole('dialog').getByRole('button', { name: /Bỏ qua|Skip/ }).click();
   check(await page.locator('text=Quy định').first().isVisible(), 'new sandbox shows connected document');
+  check(await page.locator('text=/products · 2/').first().isVisible(), 'new sandbox shows connected data source');
   await page.locator('article', { hasText: 'Soạn thư nhắc' }).getByRole('button').click();
   await page.getByRole('button', { name: /Dùng dữ liệu mẫu|Use sample data/ }).click();
   await page.getByRole('button', { name: /^(Chạy|Run)$/ }).click();
